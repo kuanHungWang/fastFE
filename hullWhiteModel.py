@@ -89,7 +89,7 @@ frequency = ql.Period('1d')
 all_dates = ql.Schedule(settlement, curve.maxDate(), frequency, calendar, convention, terminationDateConvention, rule, endOfMonth)
 
 
-timestep, length, numPaths = 24, 2, 2**3
+timestep, length, numPaths = 24, 2, 2**2
 dimension = process.factors()
 n_steps = len(all_dates)-1
 time_grid = year_fraction(all_dates, dayCount, accoumulative=True)
@@ -144,12 +144,13 @@ print(f'net_cashflows.shape: {net_cashflows.shape}')
 # V(t) = CF(t) + max(E[discounted V(t+dt)|F(t)], 0)
 # V(T) = CF(T)
 shape = (numPaths,)
+iter_dates=fixingSchedule[1:]
 exercise_dates = fixingSchedule[1:]
 observations = fixings[1:, :]
 rebates = np.zeros_like(exercise_dates)
 exercise_payoff = lambda x: np.zeros(shape)
 valuation = np.zeros(shape)
-survival = np.ones_like(net_cashflows, dtype=bool)
+survival = np.ones((len(exercise_dates), numPaths), dtype=bool)
 d_dcf = discountFactors[1:, :]/discountFactors[:-1, :]
 regressors=[]
 print(f'number of exercise_dates: {len(exercise_dates)}')
@@ -158,21 +159,26 @@ print(f'valuation.shape: {valuation.shape}')
 print(f'survival.shape: {survival.shape}')
 print(f'd_dcf.shape: {d_dcf.shape}')
 
-for i in reversed(range(len(exercise_dates))):
-    print(f'\nTime step {i}:')
+for i in reversed(range(len(iter_dates))):
+    date = iter_dates[i]
+    print(f'\nTime step {i}, date: {date}')
     print(f'Valuation from next step:{valuation}')
-    reg = linear_model.LinearRegression()
-    x = observations[i,:].reshape(-1, 1)
-    reg.fit(x, valuation)
-    y = reg.predict(x)
-    print(f'Estimated next period valuation: {y}')
-    exe_payoff = exercise_payoff(observations[i,:])
-    print(f'payoff of early exercise: {exe_payoff}')
-    not_exercise = y > exe_payoff
-    exercise = y < exe_payoff
-    print(f'Whether to exercise: {exercise}')
-    print(f'cashflow of current step: {net_cashflows[i,:]}')
-    valuation = d_dcf[i,:] * (net_cashflows[i,:] + not_exercise * valuation + exercise * exe_payoff)
+    if date in exercise_dates:
+        print(f'  Process exercise')
+        reg = linear_model.LinearRegression()
+        x = observations[i,:].reshape(-1, 1)
+        reg.fit(x, valuation)
+        y = reg.predict(x)
+        print(f'Estimated next period valuation: {y}')
+        exe_payoff = exercise_payoff(observations[i,:])
+        print(f'payoff of early exercise: {exe_payoff}')
+        not_exercise = y > exe_payoff
+        exercise = y < exe_payoff
+        print(f'Whether to exercise: {exercise}')
+        print(f'cashflow of current step: {net_cashflows[i,:]}')
+        valuation = d_dcf[i,:] * (net_cashflows[i,:] + not_exercise * valuation + exercise * exe_payoff)
+    else:
+        valuation = d_dcf[i,:] * (net_cashflows[i,:] + valuation)
     survival[i,:] = not_exercise
     regressors.insert(0,reg)
 print(valuation.mean())
