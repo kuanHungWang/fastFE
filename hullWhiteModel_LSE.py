@@ -134,67 +134,7 @@ for i in range(numPaths):
 underlying_path = np.array(underlying_path).transpose()
 fixings = np.array(fixings).transpose()
 discountFactors = np.array(discountFactors).transpose()
-print(f'underlying_path.shape: {underlying_path.shape}')
-print(f'fixings.shape: {fixings.shape}')
 
-
-
-# cashflow of interest rate swap
-# pay floating, receive fixed
-fixed_rate = 0.02
-notional = 1_000_000
-
-yf = np.array(year_fraction(paymentSchedule, dayCount, accoumulative=False))[:,np.newaxis]
-print(f'yf.shape: {yf.shape}')
-fixed_cashflows = notional * fixed_rate * yf
-print(f'fixed_cashflows.shape: {fixed_cashflows.shape}')
-floating_cashflows = notional * fixings[:-1, :] * yf # fixing in advance so use fixings[:-1]
-net_cashflows = fixed_cashflows - floating_cashflows
-print(f'net_cashflows.shape: {net_cashflows.shape}')
-
-
-
-# Longstaff-Schwartz method
-# V(t) = CF(t) + max(E[discounted V(t+dt)|F(t)], 0)
-# V(T) = CF(T)
-shape = (numPaths,)
-iter_dates=fixingSchedule[1:]
-exercise_dates = fixingSchedule[1:]
-observations = fixings[1:, :]
-exercise_payoff = lambda x: np.zeros(shape)
-valuation = np.zeros(shape)
-survival = np.ones((len(exercise_dates), numPaths), dtype=bool)
-d_dcf = discountFactors[1:, :]/discountFactors[:-1, :]
-regressors=[]
-
-print(f'number of exercise_dates: {len(exercise_dates)}')
-print(f'valuation.shape: {valuation.shape}')
-print(f'survival.shape: {survival.shape}')
-print(f'd_dcf.shape: {d_dcf.shape}')
-
-for i in reversed(range(len(iter_dates))):
-    date = iter_dates[i]
-    print(f'\nTime step {i}, date: {date}')
-    print(f'Valuation from next step:{valuation}')
-    if date in exercise_dates:
-        print(f'  Process exercise')
-        reg = linear_model.LinearRegression()
-        x = observations[i,:].reshape(-1, 1)
-        reg.fit(x, valuation)
-        y = reg.predict(x)
-        print(f'Estimated next period valuation: {y}')
-        exe_payoff = exercise_payoff(observations[i,:])
-        print(f'payoff of early exercise: {exe_payoff}')
-        not_exercise = y > exe_payoff
-        exercise = y < exe_payoff
-        print(f'Whether to exercise: {exercise}')
-        print(f'cashflow of current step: {net_cashflows[i,:]}')
-        valuation = d_dcf[i,:] * (net_cashflows[i,:] + not_exercise * valuation + exercise * exe_payoff)
-    else:
-        valuation = d_dcf[i,:] * (net_cashflows[i,:] + valuation)
-    survival[i,:] = not_exercise
-    regressors.insert(0,reg)
-print(valuation.mean())
 
 # cashflow of interest rate swap dagaFrame version
 # pay floating, receive fixed
@@ -206,7 +146,7 @@ notional = 1_000_000
 year_fraction_pay = np.array(year_fraction(paySchedule, dayCount, accoumulative=False))[:,np.newaxis]
 year_fraction_rec = np.array(year_fraction(recSchedule, dayCount, accoumulative=False))[:,np.newaxis]
 fixed_cashflows = notional * fixed_rate * year_fraction_rec
-print(f'fixed_cashflows.shape: {fixed_cashflows.shape}')
+
 fixed_cashflows_df = pd.DataFrame(fixed_cashflows, index=recSchedule[1:])
 fixed_cashflows_df = fixed_cashflows_df.reindex(all_dates)
 floating_cashflows = notional * fixings[:-1, :] * year_fraction_pay
@@ -228,43 +168,61 @@ exercise_dates = all_dates[1:-1]
 exercisable = pd.Series(index=exercise_dates, data=np.ones(len(exercise_dates), dtype=bool)).reindex(net_cashflows_df.index).fillna(False)
 print('exercisable: \n',exercisable)
 observations = pd.DataFrame(fixings, index=fixingSchedule).iloc[1:,:]
-print('observations: \n',observations)
+print('\n Observations(fixing of 6m libor rate): \n',observations)
 shape_single_step = (numPaths,)
 
 exercise_payoff = lambda x: np.zeros(shape_single_step)
 
 survival = np.ones((len(exercise_dates), numPaths), dtype=bool)
 survival_df = pd.DataFrame(survival, index=exercise_dates)
-print(f'valuation.shape: {valuation.shape}')
-print('survival: \n', survival_df)
+
 
 def get_nearest_fixing_date(d, obs_index):
     # Returns the greatest date in obs_index that is <= d
     return max([date for date in obs_index if date <= d])
 
-
+regressors=[]
 valuation = np.zeros(shape_single_step)
+print(f'valuation.shape: {valuation.shape}')
+print('\n survival: \n', survival_df)
+print('\n ****************Backward Longstaff-Schwartz method begin:*******************')
 for d in reversed(net_cashflows_df.index):
     print(f'\nTime step {d}')
+    current_cf = net_cashflows_df.loc[d]
+    
     if exercisable.loc[d]:
         print(f'  Process exercise')
+        print(f'Valuation of future cf: \n {valuation.values}')
         reg = linear_model.LinearRegression()
         nearest_fixing_date = get_nearest_fixing_date(d, observations.index)
+        print(f'using fixing date: {nearest_fixing_date} for early exercise call date: {d}')
         x = observations.loc[nearest_fixing_date].values.reshape(-1, 1)
         reg.fit(x, valuation)
         y = reg.predict(x)
-        print(f'Estimated next period valuation: {y}')
-        exe_payoff = exercise_payoff(observations.loc[d,:].values)
+        print(f'Predicted next period valuation: {y}')
+        exe_payoff = exercise_payoff(observations.loc[nearest_fixing_date,:].values)
         print(f'payoff of early exercise: {exe_payoff}')
         not_exercise = y > exe_payoff
         exercise = y < exe_payoff
         print(f'Whether to exercise: {exercise}')
-        print(f'cashflow of current step: {net_cashflows_df.loc[d,:]}')
-        valuation = dcf_df.loc[d] * (net_cashflows_df.loc[d] + not_exercise * valuation + exercise * exe_payoff)
+
+        optimized =  not_exercise * valuation + exercise * exe_payoff
+        print(f'optimized value: \n {optimized.values}')
+        valuation =  current_cf + optimized
+        print(f'cashflow of current step: \n {current_cf.values}')
+        print(f'optimized value plus current cf: \n {valuation.values}')
+        survival_df.loc[d,:] = not_exercise
+        regressors.insert(0,reg)
     else:
-        valuation = dcf_df.loc[d] * (net_cashflows_df.loc[d] + valuation)
-    survival_df.loc[d,:] = not_exercise
-    regressors.insert(0,reg)
+        print('   No early exercise, add current')
+        print(f'Valuation of future cf: \n {valuation}')
+        
+        valuation = current_cf + valuation
+        print(f'cashflow of current step: \n {current_cf.values}')
+        print(f'Futre npv plus current cf: \n {valuation.values}')
+    
+    
+    valuation = dcf_df.loc[d] * valuation
+    print(f'discount: \n {valuation.values}')
+    
 print(valuation.mean())
-
-
