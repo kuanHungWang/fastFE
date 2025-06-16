@@ -5,6 +5,12 @@ from collections import namedtuple
 import math
 from datetime import datetime, timedelta
 from sklearn import linear_model
+from typing import List, Tuple, Callable, Dict
+
+def get_nearest_fixing_date(d, obs_index):
+    # Returns the greatest date in obs_index that is <= d
+    return max([date for date in obs_index if date <= d])
+
 def year_fraction(schedule, dayCount, accoumulative=False):
     schedule = [d for d in schedule]
     if accoumulative:
@@ -19,7 +25,78 @@ def combine_schedule(*schedules):
         all_schedule = all_schedule.union(s)
     return sorted(all_schedule)
 
+class LongstaffSchwartz():
+    def __init__(self, cashflows: pd.DataFrame, 
+                 discountFactors: pd.DataFrame, 
+                 exercise_schedule: pd.Series|List, 
+                 exercise_payoff: Callable|np.ndarray|pd.DataFrame,
+                 observable: pd.DataFrame):
+        self.cashflows = cashflows
+        self.discountFactors = discountFactors
+        self.exercise_schedule = exercise_schedule
+        self.observable = observable
+        self.exercise_payoff = exercise_payoff
 
+    def backward_induction(self):
+        import numpy as np
+        import pandas as pd
+        np.set_printoptions(precision=2, suppress=True)
+        pd.set_option('display.float_format', lambda x: f'{x:,.2f}')
+        self.regressors = []
+        valuation = np.zeros(self.cashflows.shape[1])  # shape_single_step
+        print(f'valuation.shape: {valuation.shape}')
+        survival = pd.DataFrame(
+            np.ones(self.cashflows.shape,dtype=bool),  # or proper shape
+            index=self.cashflows.index,
+            columns=self.cashflows.columns
+            
+        )
+        print('\n ****************Backward Longstaff-Schwartz method begin:*******************')
+        for d in reversed(self.cashflows.index):
+            print(f'\nTime step {d}')
+            current_cf = self.cashflows.loc[d]
+            if self.exercise_schedule.loc[d]:
+                print('\n  Process exercise')
+                print('Valuation of future cf:')
+                print(np.round(valuation.values, 2))
+                reg = linear_model.LinearRegression()
+                nearest_fixing_date = get_nearest_fixing_date(d, self.observable.index)
+                print(f'using fixing date: {nearest_fixing_date} for early exercise call date: {d}')
+                x = self.observable.loc[nearest_fixing_date].values.reshape(-1, 1)
+                reg.fit(x, valuation)
+                y = reg.predict(x)
+                print(f'Predicted valuation of not exercising: {np.round(y, 2)}')
+                exe_payoff = self.exercise_payoff(self.observable.loc[nearest_fixing_date,:].values)
+                print(f'payoff of early exercise: {np.round(exe_payoff, 2)}')
+                not_exercise = y > exe_payoff
+                exercise = y < exe_payoff
+                print(f'Whether to exercise: {exercise}')
+
+                optimized = not_exercise * valuation + exercise * exe_payoff
+                print('optimized value:')
+                print(np.round(optimized.values, 2))
+                valuation = current_cf + optimized
+                print('cashflow of current step:')
+                print(np.round(current_cf.values, 2))
+                print('optimized value plus current cf:')
+                print(np.round(valuation.values, 2))
+                survival.loc[d,:] = not_exercise
+                self.regressors.insert(0, reg)
+            else:
+                print('\n   No early exercise, add current')
+                print('Valuation of future cf:')
+                print(np.round(valuation, 2))
+                valuation = current_cf + valuation
+                print('cashflow of current step:')
+                print(np.round(current_cf.values, 2))
+                print('Futre npv plus current cf:')
+                print(np.round(valuation.values, 2))
+            valuation = self.discountFactors.loc[d] * valuation
+            print('discount:')
+            print(np.round(valuation.values, 2))
+        
+        print(f'valuation of monte carlo simulation: {valuation.mean():,.2f}')
+        self.survival = survival
 
 calendar = ql.TARGET()
 dayCount=ql.Actual360()
@@ -105,7 +182,7 @@ frequency = ql.Period('1d')
 all_dates = ql.Schedule(settlement, curve.maxDate(), frequency, calendar, convention, terminationDateConvention, rule, endOfMonth)
 
 
-timestep, length, numPaths = 24, 2, 2**2
+timestep, length, numPaths = 24, 2, 4
 dimension = process.factors()
 n_steps = len(all_dates)-1
 time_grid = year_fraction(all_dates, dayCount, accoumulative=True)
@@ -141,7 +218,7 @@ discountFactors = np.array(discountFactors).transpose()
 paySchedule = [d for d in paySchedule]
 recSchedule = [d for d in recSchedule]
 all_dates = combine_schedule(paySchedule, recSchedule)
-fixed_rate = 0.02
+fixed_rate = 0.018
 notional = 1_000_000
 year_fraction_pay = np.array(year_fraction(paySchedule, dayCount, accoumulative=False))[:,np.newaxis]
 year_fraction_rec = np.array(year_fraction(recSchedule, dayCount, accoumulative=False))[:,np.newaxis]
@@ -181,52 +258,22 @@ survival = np.ones((len(exercise_dates), numPaths), dtype=bool)
 survival_df = pd.DataFrame(survival, index=exercise_dates)
 
 
-def get_nearest_fixing_date(d, obs_index):
-    # Returns the greatest date in obs_index that is <= d
-    return max([date for date in obs_index if date <= d])
 
-regressors=[]
-valuation = np.zeros(shape_single_step)
-print(f'valuation.shape: {valuation.shape}')
-print('\n survival: \n', survival_df)
-print('\n ****************Backward Longstaff-Schwartz method begin:*******************')
-for d in reversed(net_cashflows_df.index):
-    print(f'\nTime step {d}')
-    current_cf = net_cashflows_df.loc[d]
-    
-    if exercisable.loc[d]:
-        print('\n  Process exercise')
-        print(f'Valuation of future cf: \n {valuation.values}')
-        reg = linear_model.LinearRegression()
-        nearest_fixing_date = get_nearest_fixing_date(d, observations.index)
-        print(f'using fixing date: {nearest_fixing_date} for early exercise call date: {d}')
-        x = observations.loc[nearest_fixing_date].values.reshape(-1, 1)
-        reg.fit(x, valuation)
-        y = reg.predict(x)
-        print(f'Predicted valuation of not exercising: {y}')
-        exe_payoff = exercise_payoff(observations.loc[nearest_fixing_date,:].values)
-        print(f'payoff of early exercise: {exe_payoff}')
-        not_exercise = y > exe_payoff
-        exercise = y < exe_payoff
-        print(f'Whether to exercise: {exercise}')
 
-        optimized =  not_exercise * valuation + exercise * exe_payoff
-        print(f'optimized value: \n {optimized.values}')
-        valuation =  current_cf + optimized
-        print(f'cashflow of current step: \n {current_cf.values}')
-        print(f'optimized value plus current cf: \n {valuation.values}')
-        survival_df.loc[d,:] = not_exercise
-        regressors.insert(0,reg)
-    else:
-        print('\n   No early exercise, add current')
-        print(f'Valuation of future cf: \n {valuation}')
+
+
+
+
+
+
         
-        valuation = current_cf + valuation
-        print(f'cashflow of current step: \n {current_cf.values}')
-        print(f'Futre npv plus current cf: \n {valuation.values}')
-    
-    
-    valuation = dcf_df.loc[d] * valuation
-    print(f'discount: \n {valuation.values}')
-    
-print(f'valuation of monte carlo simulation: {valuation.mean()}')
+
+# OOP version of Longstaff-Schwartz
+lse = LongstaffSchwartz(
+    cashflows=net_cashflows_df,
+    discountFactors=dcf_df,
+    exercise_schedule=exercisable,
+    exercise_payoff=exercise_payoff,
+    observable=observations
+)
+lse.backward_induction()
