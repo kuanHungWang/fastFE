@@ -98,6 +98,85 @@ class LongstaffSchwartz():
         print(f'valuation of monte carlo simulation: {valuation.mean():,.2f}')
         self.survival = survival
 
+def  calibrate_hull_white_model(term_structure, swaptions):
+    
+    # calibrate parametors of hull-white model from swaptions
+    index = ql.Euribor1Y(term_structure)
+    CalibrationData = namedtuple("CalibrationData", 
+                                "start, length, volatility")
+
+    data = [CalibrationData(1, 5, 0.1148),
+            CalibrationData(2, 4, 0.1108),
+            CalibrationData(3, 3, 0.1070),
+            CalibrationData(4, 2, 0.1021),
+            CalibrationData(5, 1, 0.1000 )]
+
+    model = ql.HullWhite(term_structure);
+    engine = ql.JamshidianSwaptionEngine(model)
+
+    def create_swaption_helpers(maturity, length , volatility):
+        swaption= ql.SwaptionHelper(ql.Period(maturity, ql.Years),
+                                ql.Period(length, ql.Years),
+                                ql.QuoteHandle(ql.SimpleQuote(volatility)),
+                                index,
+                                ql.Period('1Y'),
+                                ql.Thirty360(ql.Thirty360.NASD),
+                                ql.Actual360(),
+                                term_structure)
+        swaption.setPricingEngine(engine)
+        return swaption
+
+    swaptions = [create_swaption_helpers(int(inst['start']), int(inst['length']), float(inst['volatility'])) for (index, inst) in swaptions.iterrows()]
+
+    optimization_method = ql.LevenbergMarquardt(1.0e-8,1.0e-8,1.0e-8)
+    end_criteria = ql.EndCriteria(10000, 100, 1e-6, 1e-8, 1e-8)
+    model.calibrate(swaptions, optimization_method, end_criteria)
+
+    a, sigma = model.params()
+    print(f'Calibration of hull-white model: a={a}, sigma={sigma}')
+
+    return a, sigma
+
+def generate_HW1F_path(process, index_factory, fixing_date, payment_date, numPaths):
+    
+
+
+    # As hull-white model is a short rate model, underlying rate must generate every day, not only fixing dates.
+    frequency = ql.Period('1d')
+    all_dates = ql.Schedule(settlement, curve.maxDate(), frequency, calendar, convention, terminationDateConvention, rule, endOfMonth)
+    dayCount=ql.Actual360()
+
+    dimension = process.factors()
+    n_steps = len(all_dates)-1
+    time_grid = year_fraction(all_dates, dayCount, accoumulative=True)
+    rng = ql.UniformRandomSequenceGenerator(dimension * n_steps, ql.UniformRandomGenerator())
+    sequenceGenerator = ql.GaussianRandomSequenceGenerator(rng)
+    pathGenerator = ql.GaussianMultiPathGenerator(process, time_grid, sequenceGenerator, False)
+
+
+    underlying_path = []
+    forward_curves=[]
+    fixings = []
+    discountFactors = []
+    for i in range(numPaths):
+        samplePath = pathGenerator.next()
+        values = samplePath.value()
+        underlying = values[0]
+        underlying = [s for s in underlying]
+        underlying_path.append(underlying)
+        fwd_crv = ql.ForwardCurve([d for d in all_dates], underlying, dayCount)
+        ts = ql.YieldTermStructureHandle(fwd_crv)
+        index=index_factory(ts)
+        fixings.append([index.fixing(d) for d in fixingSchedule])
+        discountFactors.append([fwd_crv.discount(d) for d in paymentSchedule])
+        forward_curves.append(fwd_crv)
+        
+    underlying_path = np.array(underlying_path).transpose()
+    fixings = np.array(fixings).transpose()
+    discountFactors = np.array(discountFactors).transpose()
+    return underlying_path, fixings, discountFactors, forward_curves
+
+    
 calendar = ql.TARGET()
 dayCount=ql.Actual360()
 today = ql.Date().todaysDate()
@@ -112,40 +191,7 @@ zeros = [0.015, 0.018, 0.02, 0.022, .025, .03, .035]
 curve = ql.ZeroCurve(dates, zeros, ql.Actual360(), ql.TARGET())
 term_structure = ql.YieldTermStructureHandle(curve)
 
-# calibrate parametors of hull-white model from swaptions
-index = ql.Euribor1Y(term_structure)
-CalibrationData = namedtuple("CalibrationData", 
-                             "start, length, volatility")
 
-data = [CalibrationData(1, 5, 0.1148),
-        CalibrationData(2, 4, 0.1108),
-        CalibrationData(3, 3, 0.1070),
-        CalibrationData(4, 2, 0.1021),
-        CalibrationData(5, 1, 0.1000 )]
-
-model = ql.HullWhite(term_structure);
-engine = ql.JamshidianSwaptionEngine(model)
-
-def create_swaption_helpers(maturity, length , volatility):
-    swaption= ql.SwaptionHelper(ql.Period(maturity, ql.Years),
-                             ql.Period(length, ql.Years),
-                             ql.QuoteHandle(ql.SimpleQuote(volatility)),
-                             index,
-                             ql.Period('1Y'),
-                             ql.Thirty360(ql.Thirty360.NASD),
-                             ql.Actual360(),
-                             term_structure)
-    swaption.setPricingEngine(engine)
-    return swaption
-
-swaptions = [create_swaption_helpers(inst.start, inst.length, inst.volatility) for inst in data]
-
-optimization_method = ql.LevenbergMarquardt(1.0e-8,1.0e-8,1.0e-8)
-end_criteria = ql.EndCriteria(10000, 100, 1e-6, 1e-8, 1e-8)
-model.calibrate(swaptions, optimization_method, end_criteria)
-
-a, sigma = model.params()
-print(f'Calibration of hull-white model: a={a}, sigma={sigma}')
 
 # create schedule
 calendar = ql.TARGET()
@@ -172,47 +218,26 @@ for fixing_date, pay_date in zip(fixingSchedule, paymentSchedule):
     print(f"{fixing_date.year()}-{fixing_date.month()}-{fixing_date.dayOfMonth()}, {pay_date.year()}-{pay_date.month()}-{pay_date.dayOfMonth()}")
 
 
+swaptions=pd.DataFrame(dict(start=[1,2,3,4,5], length=[5,4,3,2,1], volatility=[0.1148,0.1108,0.1070,0.1021,0.1000]))
+
+
+
+
+
+a, sigma = calibrate_hull_white_model(term_structure, swaptions)
+
 # HullWhiteProcess
-euribor_6m=ql.IborIndex('MyIndex', ql.Period('6m'), 2, ql.EURCurrency(), ql.TARGET(), ql.ModifiedFollowing, True, ql.Actual360())
 
 process = ql.HullWhiteProcess(term_structure, a, sigma)
 
-# As hull-white model is a short rate model, underlying rate must generate every day, not only fixing dates.
-frequency = ql.Period('1d')
-all_dates = ql.Schedule(settlement, curve.maxDate(), frequency, calendar, convention, terminationDateConvention, rule, endOfMonth)
+def create_ibor_6M(ts):
+    return ql.IborIndex('MyIndex', ql.Period('6m'), 2, ql.EURCurrency(), ql.TARGET(), ql.ModifiedFollowing, True, ql.Actual360(), ts)
 
 
-timestep, length, numPaths = 24, 2, 4
-dimension = process.factors()
-n_steps = len(all_dates)-1
-time_grid = year_fraction(all_dates, dayCount, accoumulative=True)
-rng = ql.UniformRandomSequenceGenerator(dimension * n_steps, ql.UniformRandomGenerator())
-sequenceGenerator = ql.GaussianRandomSequenceGenerator(rng)
-pathGenerator = ql.GaussianMultiPathGenerator(process, time_grid, sequenceGenerator, False)
 
 
-underlying_path = []
-forward_curves=[]
-fixings = []
-discountFactors = []
-for i in range(numPaths):
-    samplePath = pathGenerator.next()
-    values = samplePath.value()
-    underlying = values[0]
-    underlying = [s for s in underlying]
-    underlying_path.append(underlying)
-    fwd_crv = ql.ForwardCurve([d for d in all_dates], underlying, ql.Actual360())
-    ts = ql.YieldTermStructureHandle(fwd_crv)
-    index=ql.IborIndex('MyIndex', ql.Period('6m'), 2, ql.EURCurrency(), ql.TARGET(), ql.ModifiedFollowing, True, ql.Actual360(), ts)
-    fixings.append([index.fixing(d) for d in fixingSchedule])
-    discountFactors.append([fwd_crv.discount(d) for d in paymentSchedule])
-    forward_curves.append(fwd_crv)
-    
-underlying_path = np.array(underlying_path).transpose()
-fixings = np.array(fixings).transpose()
-discountFactors = np.array(discountFactors).transpose()
-
-
+numPaths = 4
+underlying_path, fixings, discountFactors, forward_curves = generate_HW1F_path(process, create_ibor_6M, fixingSchedule, paymentSchedule, numPaths)
 # cashflow of interest rate swap dagaFrame version
 # pay floating, receive fixed
 paySchedule = [d for d in paySchedule]
@@ -224,28 +249,30 @@ year_fraction_pay = np.array(year_fraction(paySchedule, dayCount, accoumulative=
 year_fraction_rec = np.array(year_fraction(recSchedule, dayCount, accoumulative=False))[:,np.newaxis]
 fixed_cashflows = notional * fixed_rate * year_fraction_rec
 
-fixed_cashflows_df = pd.DataFrame(fixed_cashflows, index=recSchedule[1:])
-fixed_cashflows_df = fixed_cashflows_df.reindex(all_dates)
+fixed_cashflows = pd.DataFrame(fixed_cashflows, index=recSchedule[1:])
+fixed_cashflows = fixed_cashflows.reindex(all_dates)
 floating_cashflows = notional * fixings[:-1, :] * year_fraction_pay
-floating_cashflows_df = pd.DataFrame(floating_cashflows, index=paySchedule[1:])
-floating_cashflows_df = floating_cashflows_df.reindex(all_dates)
-net_cashflows = fixed_cashflows_df.values - floating_cashflows_df.values
-net_cashflows_df = pd.DataFrame(net_cashflows, index = all_dates)
-net_cashflows_df = net_cashflows_df.iloc[1:]
+floating_cashflows = pd.DataFrame(floating_cashflows, index=paySchedule[1:])
+floating_cashflows = floating_cashflows.reindex(all_dates)
+
+net_cashflows = fixed_cashflows.values - floating_cashflows.values  # use numpy array to calculate net cashflows for broadcast.
+net_cashflows = pd.DataFrame(net_cashflows, index = all_dates)
+net_cashflows = net_cashflows.iloc[1:]
+
 print('\n receive fixed cash flow: ')
-print(fixed_cashflows_df)
+print(fixed_cashflows)
 print(f'\n pay floating cash flow (with {numPaths} simulation paths): ')
-print(floating_cashflows_df)
+print(floating_cashflows)
 print(f'\n net cash flow: ')
-print(net_cashflows_df)
+print(net_cashflows)
 
 dcf = discountFactors[1:, :]/discountFactors[:-1, :]
-dcf_df = pd.DataFrame(dcf, index = all_dates[1:])
+dcf = pd.DataFrame(dcf, index = all_dates[1:])
 exercise_dates = all_dates[1:-1]
 exercisable = pd.Series(
     np.ones(len(exercise_dates), dtype=bool),
     index=exercise_dates
-).reindex(net_cashflows_df.index, fill_value=False)
+).reindex(net_cashflows.index, fill_value=False)
 
 print('\n call schedule: \n',exercisable)
 observations = pd.DataFrame(fixings, index=fixingSchedule).iloc[1:,:]
@@ -255,7 +282,7 @@ shape_single_step = (numPaths,)
 exercise_payoff = lambda x: np.zeros(shape_single_step)
 
 survival = np.ones((len(exercise_dates), numPaths), dtype=bool)
-survival_df = pd.DataFrame(survival, index=exercise_dates)
+survival = pd.DataFrame(survival, index=exercise_dates)
 
 
 
@@ -270,8 +297,8 @@ survival_df = pd.DataFrame(survival, index=exercise_dates)
 
 # OOP version of Longstaff-Schwartz
 lse = LongstaffSchwartz(
-    cashflows=net_cashflows_df,
-    discountFactors=dcf_df,
+    cashflows=net_cashflows,
+    discountFactors=dcf,
     exercise_schedule=exercisable,
     exercise_payoff=exercise_payoff,
     observable=observations
