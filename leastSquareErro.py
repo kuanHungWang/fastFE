@@ -7,6 +7,10 @@ from datetime import datetime, timedelta
 from sklearn import linear_model
 from typing import List, Tuple, Callable, Dict
 
+
+
+
+
 def get_nearest_fixing_date(d, obs_index):
     # Returns the greatest date in obs_index that is <= d
     return max([date for date in obs_index if date <= d])
@@ -176,11 +180,22 @@ def generate_HW1F_path(process, index_factory, fixing_date, payment_date, numPat
     discountFactors = np.array(discountFactors).transpose()
     return underlying_path, fixings, discountFactors, forward_curves
 
-    
+def get_settlement_date(trade_date, settlement_days, calendar):
+    return calendar.advance(trade_date,ql.Period(settlement_days, ql.Days))
+
+
+settlement_days = 2
 calendar = ql.TARGET()
+currency = ql.EURCurrency()
 dayCount=ql.Actual360()
+date_rolling_convention = ql.ModifiedFollowing
+date_termination_convention = ql.ModifiedFollowing
+date_generation_rule = ql.DateGeneration.Backward
+endOfMonth = False
+
+
 today = ql.Date().todaysDate()
-settlement = calendar.advance(today,ql.Period(2, ql.Days))
+settlement = get_settlement_date(today, settlement_days, calendar)
 ql.Settings.instance().evaluationDate = today
 
 # termstructure from zero rates
@@ -188,23 +203,20 @@ ql.Settings.instance().evaluationDate = today
 dates = [calendar.advance(settlement,ql.Period(y, ql.Years)) for y in [0, 1, 2, 3,4,5,10]]
 zeros = [0.015, 0.018, 0.02, 0.022, .025, .03, .035]
 
-curve = ql.ZeroCurve(dates, zeros, ql.Actual360(), ql.TARGET())
+curve = ql.ZeroCurve(dates, zeros, dayCount, calendar)
 term_structure = ql.YieldTermStructureHandle(curve)
 
 
 
 # create schedule
-calendar = ql.TARGET()
-today = ql.Date().todaysDate()
-settlement = calendar.advance(today,ql.Period(2, ql.Days))
 terminationDate = calendar.advance(today,ql.Period(3, ql.Years))
 frequency = ql.Period('6M')
 convention = ql.ModifiedFollowing
 terminationDateConvention = ql.ModifiedFollowing
-rule = ql.DateGeneration.Backward
-endOfMonth = False
-paySchedule = ql.Schedule(settlement, terminationDate, ql.Period('6M'), calendar, convention, terminationDateConvention, rule, endOfMonth)
-recSchedule = ql.Schedule(settlement, terminationDate, ql.Period('6M'), calendar, convention, terminationDateConvention, rule, endOfMonth)
+rule = date_generation_rule
+
+paySchedule = ql.Schedule(settlement, terminationDate, frequency, calendar, convention, terminationDateConvention, rule, endOfMonth)
+recSchedule = ql.Schedule(settlement, terminationDate, frequency, calendar, convention, terminationDateConvention, rule, endOfMonth)
 
 
 paymentSchedule = combine_schedule(paySchedule, recSchedule)
@@ -231,7 +243,7 @@ a, sigma = calibrate_hull_white_model(term_structure, swaptions)
 process = ql.HullWhiteProcess(term_structure, a, sigma)
 
 def create_ibor_6M(ts):
-    return ql.IborIndex('MyIndex', ql.Period('6m'), 2, ql.EURCurrency(), ql.TARGET(), ql.ModifiedFollowing, True, ql.Actual360(), ts)
+    return ql.IborIndex('MyIndex', ql.Period('6m'), 2, currency, calendar, date_rolling_convention, True, dayCount, ts)
 
 
 
