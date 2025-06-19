@@ -1,15 +1,24 @@
 import QuantLib as ql
-forward6mLevel = 0.025
-forward6mQuote = ql.QuoteHandle(ql.SimpleQuote(forward6mLevel))
-yts6m = ql.FlatForward(0, ql.TARGET(), forward6mQuote, ql.Actual365Fixed() )
-yts6mh = ql.YieldTermStructureHandle(yts6m)
+from datetime import datetime
+effectiveDate = datetime(2020,6,15)
+terminationDate = datetime(2022,6,15)
 
-name = 'overnightIndex'
-fixingDays = 1
-currency = ql.USDCurrency()
-calendar = ql.UnitedStates(ql.UnitedStates.Settlement)
+def to_ql_date(d: datetime):
+    return ql.Date(d.day, d.month, d.year)
+effectiveDate = to_ql_date(effectiveDate)
+terminationDate = to_ql_date(terminationDate)
+frequency = ql.Period('1Y')
+calendar = ql.UnitedStates(ql.UnitedStates.GovernmentBond)
+convention = ql.ModifiedFollowing
+terminationDateConvention = ql.ModifiedFollowing
+rule = ql.DateGeneration.Backward
+endOfMonth = False
+schedule = ql.Schedule(effectiveDate, terminationDate, frequency, calendar, convention, terminationDateConvention, rule, endOfMonth)
+print(len(schedule))
+quote = ql.QuoteHandle(ql.SimpleQuote(115.5))
+settlementDays = 2
+faceAmount = 100
+
+coupons = [0.0195]*len(schedule)
 dayCounter = ql.Actual360()
-overnight_index = ql.OvernightIndex(name, fixingDays, currency, calendar, dayCounter)
-period = '3M'
-rate = 0.01
-oishelper = ql.OISRateHelper(2,ql.Period(period), ql.QuoteHandle(ql.SimpleQuote(rate)),overnight_index)
+helper = ql.FixedRateBondHelper(quote, settlementDays, faceAmount, schedule, coupons, dayCounter)
