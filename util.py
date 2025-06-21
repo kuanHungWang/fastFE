@@ -12,8 +12,7 @@ def to_ql_date(d: datetime):
 def get_settlement_date(trade_date, settlement_days, calendar):
     return calendar.advance(trade_date,ql.Period(settlement_days, ql.Days))
 
-
-def create_deposit_rate_helpers(df: pd.DataFrame, calendar, conventions: dict = None):
+def create_deposit_rate_helpers(df: pd.DataFrame,  conventions: dict = None):
     """
     Create a list of QuantLib DepositRateHelper objects from a DataFrame.
     The DataFrame must have columns: 'tenor' (string) and 'rates' (float).
@@ -26,6 +25,7 @@ def create_deposit_rate_helpers(df: pd.DataFrame, calendar, conventions: dict = 
     convention = conventions.get('date_rolling_convention', ql.ModifiedFollowing)
     endOfMonth = conventions.get('date_end_of_month', False)
     dayCounter = conventions.get('dayCounter', ql.Actual360())
+    calendar = conventions.get('calendar', ql.UnitedStates(ql.UnitedStates.Settlement))
     helpers = []
     for _, row in df.iterrows():
         quote = ql.QuoteHandle(ql.SimpleQuote(row['rates']))
@@ -36,7 +36,7 @@ def create_deposit_rate_helpers(df: pd.DataFrame, calendar, conventions: dict = 
         helpers.append(helper)
     return helpers
 
-def create_fra_rate_helpers(df: pd.DataFrame, calendar, conventions: dict = None):
+def create_fra_rate_helpers(df: pd.DataFrame, conventions: dict = None):
     """
     Create a list of QuantLib FraRateHelper objects from a DataFrame.
     The DataFrame must have columns: 'monthsToStart' (int), 'monthsToEnd' (int), and 'rates' (float).
@@ -49,6 +49,7 @@ def create_fra_rate_helpers(df: pd.DataFrame, calendar, conventions: dict = None
     convention = conventions.get('date_rolling_convention', ql.ModifiedFollowing)
     endOfMonth = conventions.get('date_end_of_month', False)
     dayCounter = conventions.get('dayCounter', ql.Actual360())
+    calendar = conventions.get('calendar', ql.UnitedStates(ql.UnitedStates.Settlement))
     helpers = []
     for _, row in df.iterrows():
         quote = ql.QuoteHandle(ql.SimpleQuote(row['rates']))
@@ -60,7 +61,7 @@ def create_fra_rate_helpers(df: pd.DataFrame, calendar, conventions: dict = None
         helpers.append(helper)
     return helpers
 
-def create_swap_rate_helpers(df: pd.DataFrame, calendar, currency, fixed_leg_conventions: dict = None, floating_leg_conventions: dict = None):
+def create_swap_rate_helpers(df: pd.DataFrame, fixed_leg_conventions: dict = None, floating_leg_conventions: dict = None):
     """
     Create a list of QuantLib SwapRateHelper objects from a DataFrame.
     The DataFrame must have columns: 'rate' (float), 'tenor' (string).
@@ -77,8 +78,12 @@ def create_swap_rate_helpers(df: pd.DataFrame, calendar, currency, fixed_leg_con
     fixedDayCount = fixed_leg_conventions.get('dayCount', ql.Thirty360(ql.Thirty360.BondBasis))
     floatingDayCount = floating_leg_conventions.get('dayCount', ql.Actual360())
     floatingSettlementDays = floating_leg_conventions.get('settlement_days', 2)
-
-    iborIndex = ql.Libor('libor', floatingFrequency, floatingSettlementDays, currency, calendar, floatingDayCount)
+    calendar = floating_leg_conventions.get('calendar', ql.UnitedStates(ql.UnitedStates.Settlement))
+    currency = floating_leg_conventions.get('currency', ql.USDCurrency())
+    if currency == ql.EURCurrency():
+        iborIndex = ql.Euribor(floatingFrequency)
+    else:
+        iborIndex = ql.Libor('libor', floatingFrequency, floatingSettlementDays, currency, calendar, floatingDayCount)
 
     helpers = []
     for _, row in df.iterrows():
@@ -103,12 +108,12 @@ def create_sofr_future_rate_helpers(df: pd.DataFrame):
         month = row['month']
         year = row['year']
         freq = row['frequency']
-        print(f'price: {price}, month: {month}, year: {year}, frequency: {freq}')
+
         helper = ql.SofrFutureRateHelper(price, int(month), int(year), int(freq))
         helpers.append(helper)
     return helpers
 
-def create_OIS_helper(df: pd.DataFrame, currency, calendar, conventions: dict = None):
+def create_OIS_helper(df: pd.DataFrame, conventions: dict = None):
     """
     Create a list of QuantLib OISRateHelper objects from a DataFrame.
     The DataFrame must have columns: 'tenor' (string) and 'rates' (float).
@@ -119,6 +124,8 @@ def create_OIS_helper(df: pd.DataFrame, currency, calendar, conventions: dict = 
         conventions = {}
     fixingDays = conventions.get('settlement_days', 2)
     dayCounter = conventions.get('dayCounter', ql.Actual360())
+    calendar = conventions.get('calendar', ql.UnitedStates(ql.UnitedStates.Settlement))
+    currency = conventions.get('currency', ql.USDCurrency())
     overnight_index = ql.OvernightIndex('overnightIndex', fixingDays, currency, calendar, dayCounter)
     helpers = []
     for _, row in df.iterrows():
@@ -209,9 +216,139 @@ class Conventions:
         conventions['currency'] = ql.EURCurrency()
         return conventions
 
-        
+    @classmethod
+    def TWDFixedLegConventions(cls):
+        conventions = FIXED_LEG_CONVENTIONS.copy()
+        conventions['calendar'] = ql.Taiwan()
+        conventions['currency'] = ql.TWDCurrency()
+        return conventions
+
+    @classmethod
+    def TWDFloatingLegConventions(cls):
+        conventions = FLOATING_LEG_CONVENTIONS.copy()
+        conventions['calendar'] = ql.Taiwan()
+        conventions['currency'] = ql.TWDCurrency()
+        return conventions
+
+    @classmethod
+    def JPYFixedLegConventions(cls):
+        conventions = FIXED_LEG_CONVENTIONS.copy()
+        conventions['calendar'] = ql.Japan()
+        conventions['currency'] = ql.JPYCurrency()
+        return conventions
+
+    @classmethod
+    def JPYFloatingLegConventions(cls):
+        conventions = FLOATING_LEG_CONVENTIONS.copy()
+        conventions['calendar'] = ql.Japan()
+        conventions['currency'] = ql.JPYCurrency()
+        return conventions
+
+    @classmethod
+    def AUDFixedLegConventions(cls):
+        conventions = FIXED_LEG_CONVENTIONS.copy()
+        conventions['calendar'] = ql.Australia()
+        conventions['currency'] = ql.AUDCurrency()
+        return conventions
+
+    @classmethod
+    def AUDFloatingLegConventions(cls):
+        conventions = FLOATING_LEG_CONVENTIONS.copy()
+        conventions['calendar'] = ql.Australia()
+        conventions['currency'] = ql.AUDCurrency()
+        return conventions
+
+    @classmethod
+    def CHFFixedLegConventions(cls):
+        conventions = FIXED_LEG_CONVENTIONS.copy()
+        conventions['calendar'] = ql.Switzerland()
+        conventions['currency'] = ql.CHFCurrency()
+        return conventions
+
+    @classmethod
+    def CHFFloatingLegConventions(cls):
+        conventions = FLOATING_LEG_CONVENTIONS.copy()
+        conventions['calendar'] = ql.Switzerland()
+        conventions['currency'] = ql.CHFCurrency()
+        return conventions
+
+    @classmethod
+    def GBPFixedLegConventions(cls):
+        conventions = FIXED_LEG_CONVENTIONS.copy()
+        conventions['calendar'] = ql.UnitedKingdom(ql.UnitedKingdom.Settlement)
+        conventions['currency'] = ql.GBPCurrency()
+        return conventions
+
+    @classmethod
+    def GBPFloatingLegConventions(cls):
+        conventions = FLOATING_LEG_CONVENTIONS.copy()
+        conventions['calendar'] = ql.UnitedKingdom(ql.UnitedKingdom.Settlement)
+        conventions['currency'] = ql.GBPCurrency()
+        return conventions
+
+    @classmethod
+    def EUROISConventions(cls):
+        return {
+            'settlement_days': 2,
+            'dayCounter': ql.Actual360(),
+            'calendar': ql.TARGET(),
+            'currency': ql.EURCurrency()
+        }
+    
+    @classmethod
+    def GBPOISConventions(cls):
+        return {
+            'settlement_days': 0,
+            'dayCounter': ql.Actual365Fixed(),
+            'calendar': ql.UnitedKingdom(ql.UnitedKingdom.Settlement),
+            'currency': ql.GBPCurrency()
+        }
+
+    @classmethod
+    def JPYOISConventions(cls):
+        return {
+            'settlement_days': 2,
+            'dayCounter': ql.Actual365Fixed(),
+            'calendar': ql.Japan(),
+            'currency': ql.JPYCurrency()
+        }
+
+    @classmethod
+    def CHFOISConventions(cls):
+        return {
+            'settlement_days': 2,
+            'dayCounter': ql.Actual360(),
+            'calendar': ql.Switzerland(),
+            'currency': ql.CHFCurrency()
+        }
     @classmethod
     def USTreasuryConventions(cls):
+        return {
+            'settlement_days': 1,
+            'frequency': ql.Period('1Y'),
+            'date_rolling_convention': ql.Following,
+            'date_termination_convention': ql.Following,
+            'rule': ql.DateGeneration.Backward,
+            'endOfMonth': False,
+            'dayCounter': ql.ActualActual(ql.ActualActual.ISDA),
+            'calendar': ql.UnitedStates(ql.UnitedStates.GovernmentBond)
+        }
+
+    @classmethod
+    def EURTreasuryConventions(cls):
+        return {
+            'settlement_days': 2,
+            'frequency': ql.Period('1Y'),
+            'date_rolling_convention': ql.ModifiedFollowing,
+            'date_termination_convention': ql.ModifiedFollowing,
+            'rule': ql.DateGeneration.Backward,
+            'endOfMonth': False,
+            'dayCounter': ql.ActualActual(ql.ActualActual.ISMA),
+            'calendar': ql.TARGET()
+        }
+
+    @classmethod
+    def JPYTreasuryConventions(cls):
         return {
             'settlement_days': 2,
             'frequency': ql.Period('1Y'),
@@ -219,9 +356,97 @@ class Conventions:
             'date_termination_convention': ql.Following,
             'rule': ql.DateGeneration.Backward,
             'endOfMonth': False,
-            'dayCounter': ql.ActualActual(ql.ActualActual.ISDA)
+            'dayCounter': ql.ActualActual(ql.ActualActual.ISDA),
+            'calendar': ql.Japan()
         }
-    
+        
+    @classmethod
+    def TWDTreasuryConventions(cls):
+        return {
+            'settlement_days': 2,
+            'frequency': ql.Period('1Y'),
+            'date_rolling_convention': ql.Following,
+            'date_termination_convention': ql.Following,
+            'rule': ql.DateGeneration.Backward,
+            'endOfMonth': False,
+            'dayCounter': ql.ActualActual(ql.ActualActual.ISDA),
+            'calendar': ql.Taiwan()
+        }
+
+
+
+
+
+def create_USD_deposit_rate_helpers(df: pd.DataFrame):
+    conventions = Conventions.USFixedLegConventions()
+    return create_deposit_rate_helpers(df, conventions)
+
+def create_EUR_deposit_rate_helpers(df: pd.DataFrame):
+    conventions = Conventions.EURFixedLegConventions()
+    return create_deposit_rate_helpers(df, conventions)
+
+def create_JPY_deposit_rate_helpers(df: pd.DataFrame):
+    conventions = Conventions.JPYFixedLegConventions()
+    return create_deposit_rate_helpers(df, conventions)
+
+def create_TWDeposit_rate_helpers(df: pd.DataFrame):
+    conventions = Conventions.TWDFixedLegConventions()
+    return create_deposit_rate_helpers(df, conventions)
+
+def create_CHF_deposit_rate_helpers(df: pd.DataFrame):
+    conventions = Conventions.CHFFixedLegConventions()
+    return create_deposit_rate_helpers(df, conventions)
+
+def create_GBP_deposit_rate_helpers(df: pd.DataFrame):
+    conventions = Conventions.GBPFixedLegConventions()
+    return create_deposit_rate_helpers(df, conventions)
+
+def create_USD_swap_rate_helpers(df: pd.DataFrame):
+    fixed_leg_conventions = Conventions.USFixedLegConventions()
+    floating_leg_conventions = Conventions.USFloatingLegConventions()
+    return create_swap_rate_helpers(df, fixed_leg_conventions, floating_leg_conventions)
+
+def create_EUR_swap_rate_helpers(df: pd.DataFrame):
+    fixed_leg_conventions = Conventions.EURFixedLegConventions()
+    floating_leg_conventions = Conventions.EURFloatingLegConventions()
+    return create_swap_rate_helpers(df, fixed_leg_conventions, floating_leg_conventions)
+
+def create_JPY_swap_rate_helpers(df: pd.DataFrame):
+    fixed_leg_conventions = Conventions.JPYFixedLegConventions()
+    floating_leg_conventions = Conventions.JPYFloatingLegConventions()
+    return create_swap_rate_helpers(df, fixed_leg_conventions, floating_leg_conventions)
+
+def create_TWD_swap_rate_helpers(df: pd.DataFrame):
+    fixed_leg_conventions = Conventions.TWDFixedLegConventions()
+    floating_leg_conventions = Conventions.TWDFloatingLegConventions()
+    return create_swap_rate_helpers(df, fixed_leg_conventions, floating_leg_conventions)
+
+def create_CHF_swap_rate_helpers(df: pd.DataFrame):
+    fixed_leg_conventions = Conventions.CHFFixedLegConventions()
+    floating_leg_conventions = Conventions.CHFFloatingLegConventions()
+    return create_swap_rate_helpers(df, fixed_leg_conventions, floating_leg_conventions)
+
+def create_GBP_swap_rate_helpers(df: pd.DataFrame):
+    fixed_leg_conventions = Conventions.GBPFixedLegConventions()
+    floating_leg_conventions = Conventions.GBPFloatingLegConventions()
+    return create_swap_rate_helpers(df, fixed_leg_conventions, floating_leg_conventions)
+
+def create_EUR_OIS_helpers(df: pd.DataFrame):
+    conventions = Conventions.EUROISConventions()
+    return create_OIS_helper(df, conventions)
+
+def create_GBP_OIS_helpers(df: pd.DataFrame):
+    conventions = Conventions.GBPOISConventions()
+    return create_OIS_helper(df, conventions)
+
+def create_JPY_OIS_helpers(df: pd.DataFrame):
+    conventions = Conventions.JPYOISConventions()
+    return create_OIS_helper(df, conventions)
+
+def create_CHF_OIS_helpers(df: pd.DataFrame):
+    conventions = Conventions.CHFOISConventions()
+    return create_OIS_helper(df, conventions)
+
 
 settlement_days = 2
 calendar = ql.TARGET()
@@ -277,24 +502,45 @@ df_bond = pd.DataFrame({
     'effectiveDate': [datetime(2020,1,15), datetime(2020,6,15)],
     'terminationDate': [datetime(2025,1,15), datetime(2025,6,15)]
 })
-swap_helpers = create_swap_rate_helpers(df_swap, calendar, ql.USDCurrency())
-deposit_helpers = create_deposit_rate_helpers(df_deposit, calendar)
-fra_helpers = create_fra_rate_helpers(df_fra, calendar)
+swap_helpers = create_swap_rate_helpers(df_swap, fixed_leg_conventions=Conventions.USFixedLegConventions(), floating_leg_conventions=Conventions.USFloatingLegConventions())
+deposit_helpers = create_deposit_rate_helpers(df_deposit)
+fra_helpers = create_fra_rate_helpers(df_fra)
 sofr_helpers = create_sofr_future_rate_helpers(df_sofr)
-oishelpers = create_OIS_helper(df_OIS, ql.EURCurrency(), calendar)
+oishelpers = create_OIS_helper(df_OIS)
 bond_helpers = create_bond_helper(df_bond)
-print(deposit_helpers)
-print(fra_helpers)
-print(swap_helpers)
-print(oishelpers)
-print(bond_helpers)
 
 
 
+
+
+
+
+
+create_USD_deposit_rate_helpers(df_deposit)
+create_EUR_deposit_rate_helpers(df_deposit)
+create_CHF_deposit_rate_helpers(df_deposit)
 # Example usage for SofrFutureRateHelper
 
+create_USD_deposit_rate_helpers(df_deposit)
+create_EUR_deposit_rate_helpers(df_deposit)
+create_JPY_deposit_rate_helpers(df_deposit)
+create_TWDeposit_rate_helpers(df_deposit)
+create_CHF_deposit_rate_helpers(df_deposit)
+create_GBP_deposit_rate_helpers(df_deposit)
+
+create_USD_swap_rate_helpers(df_swap)
+create_EUR_swap_rate_helpers(df_swap)
+create_JPY_swap_rate_helpers(df_swap)
+create_TWD_swap_rate_helpers(df_swap)
+create_CHF_swap_rate_helpers(df_swap)
+create_GBP_swap_rate_helpers(df_swap)
+create_EUR_OIS_helpers(df_OIS)
+create_GBP_OIS_helpers(df_OIS)
+create_JPY_OIS_helpers(df_OIS)
+create_CHF_OIS_helpers(df_OIS)
 
 
 
-print(sofr_helpers)
+
+
 

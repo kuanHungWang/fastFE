@@ -1,24 +1,50 @@
 import QuantLib as ql
+import pandas as pd
 from datetime import datetime
-effectiveDate = datetime(2020,6,15)
-terminationDate = datetime(2022,6,15)
+from util import (
+    create_USD_deposit_rate_helpers,
+    create_USD_swap_rate_helpers,
+)
+from typing import Literal
 
-def to_ql_date(d: datetime):
-    return ql.Date(d.day, d.month, d.year)
-effectiveDate = to_ql_date(effectiveDate)
-terminationDate = to_ql_date(terminationDate)
-frequency = ql.Period('1Y')
-calendar = ql.UnitedStates(ql.UnitedStates.GovernmentBond)
-convention = ql.ModifiedFollowing
-terminationDateConvention = ql.ModifiedFollowing
-rule = ql.DateGeneration.Backward
-endOfMonth = False
-schedule = ql.Schedule(effectiveDate, terminationDate, frequency, calendar, convention, terminationDateConvention, rule, endOfMonth)
-print(len(schedule))
-quote = ql.QuoteHandle(ql.SimpleQuote(115.5))
-settlementDays = 2
-faceAmount = 100
+def bootstrap_curve(settlementDate, helpers, dayCount, method: Literal['logLinearDiscount', 'logCubicDiscount','linearZero','cubicZero', 'linearForward','splineCubicDiscount']='linearZero'):
 
-coupons = [0.0195]*len(schedule)
-dayCounter = ql.Actual360()
-helper = ql.FixedRateBondHelper(quote, settlementDays, faceAmount, schedule, coupons, dayCounter)
+    builders = {
+        'logLinearDiscount': ql.PiecewiseLogLinearDiscount,
+        'logCubicDiscount': ql.PiecewiseLogCubicDiscount,
+        'linearZero': ql.PiecewiseLinearZero,
+        'cubicZero':    ql.PiecewiseCubicZero,
+        'linearForward': ql.PiecewiseLinearForward,
+        'splineCubicDiscount': ql.PiecewiseSplineCubicDiscount
+        }
+    builder = builders.get(method, ql.PiecewiseCubicZero)
+    return builder(settlementDate, helpers, dayCount)
+
+
+df_deposit = pd.DataFrame({
+    'tenor': ['1M', '2M', '3M', '6M', '9M'],
+    'rates': [0.015, 0.018, 0.02, 0.022, 0.025]
+})
+
+df_swap = pd.DataFrame({
+    'rate': [0.015, 0.018, 0.02, 0.022, 0.025],
+    'tenor': ['1Y', '2Y', '5Y', '7Y', '10Y']
+})
+today = ql.Date().todaysDate()
+deposit_helpers = create_USD_deposit_rate_helpers(df_deposit)
+swap_helpers = create_USD_swap_rate_helpers(df_swap)
+helpers = deposit_helpers + swap_helpers
+
+curve = bootstrap_curve(today, deposit_helpers, ql.Actual360())
+
+
+
+schedule = ql.MakeSchedule(today, today + ql.Period(3, ql.Months), ql.Period('1W'))
+
+
+
+for d in schedule:
+    print(f'{d}: {curve.zeroRate(d, ql.Actual360(), ql.Simple).rate()}')
+
+
+
