@@ -1,7 +1,7 @@
 import QuantLib as ql
 import pandas as pd
 from datetime import datetime
-from util import (
+from rate_helpers import (
     create_USD_deposit_rate_helpers,
     create_EUR_deposit_rate_helpers,
     create_JPY_deposit_rate_helpers,
@@ -30,7 +30,7 @@ from util import (
     create_bond_helper,
     create_sofr_future_rate_helpers
 )
-from util import Conventions
+from conventions import Conventions
 from typing import Literal, Tuple
 
 
