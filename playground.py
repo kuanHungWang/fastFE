@@ -32,21 +32,44 @@ deposit_helpers = create_USD_deposit_rate_helpers(df_deposit)
 swap_helpers = create_USD_swap_rate_helpers(df_swap)
 helpers = deposit_helpers + swap_helpers
 
-curve = bootstrap_curve_with_instrument_helpers(today, deposit_helpers, ql.Actual360())
+
 
 
 curve = bootstrap_curve(today, ql.Actual360(), deposit=(df_deposit, Conventions.USFixedLegConventions()), swap=(df_swap, Conventions.USFixedLegConventions(), Conventions.USFloatingLegConventions()))
 curve = bootstrap_USD_curve(today, deposit=df_deposit, swap=df_swap)
-curve = bootstrap_EUR_curve(today, deposit=df_deposit, swap=df_swap)
-curve = bootstrap_JPY_curve(today, deposit=df_deposit, swap=df_swap)
-curve = bootstrap_GBP_curve(today, deposit=df_deposit, swap=df_swap)
-curve = bootstrap_TWD_curve(today, deposit=df_deposit, swap=df_swap)
-schedule = ql.MakeSchedule(today, today + ql.Period(3, ql.Months), ql.Period('1W'))
+
+fixed_leg_conventions = Conventions.USFixedLegConventions()
+fixed_leg_conventions['tenor'] = ql.Period('1Y')
+floating_leg_conventions = Conventions.USFloatingLegConventions()
 
 
-print(curve.dayCounter())
-for d in schedule:
-    print(f'{d}: {curve.zeroRate(d, curve.dayCounter(), ql.Simple).rate()}')
+def create_swaption_helper(maturity, length, volatility, curve, fixed_leg_conventions, floating_leg_conventions):
+    # fixedFrequency = fixed_leg_conventions.get('frequency', ql.Annual)
+    # fixedConvention = fixed_leg_conventions.get('date_rolling_convention', ql.Following)
+    fixedLegTenor = fixed_leg_conventions.get('tenor', ql.Period('1Y'))
+    floatingFrequency = floating_leg_conventions.get('frequency', ql.Period('6M'))
+    fixedDayCount = fixed_leg_conventions.get('dayCount', ql.Thirty360(ql.Thirty360.BondBasis))
+    floatingDayCount = floating_leg_conventions.get('dayCount', ql.Actual360())
+    floatingConvention = floating_leg_conventions.get('date_rolling_convention', ql.Following)
+    floatingSettlementDays = floating_leg_conventions.get('settlement_days', 2)
+    floatingEndOfMonth = floating_leg_conventions.get('endOfMonth', False)
+    calendar = floating_leg_conventions.get('calendar', ql.UnitedStates(ql.UnitedStates.Settlement))
+    currency = floating_leg_conventions.get('currency', ql.USDCurrency())
+
+
+    maturity = ql.Period(maturity)
+    length = ql.Period(length)
+    volatility = ql.QuoteHandle(ql.SimpleQuote(volatility))
+    index = ql.IborIndex('iborIndex', floatingFrequency, floatingSettlementDays, currency, calendar, floatingConvention, floatingEndOfMonth, floatingDayCount)
+
+    yts = ql.YieldTermStructureHandle(curve)
+
+    return ql.SwaptionHelper(
+    maturity, length, volatility, index, fixedLegTenor,
+    fixedDayCount, floatingDayCount, yts
+    )
+
+create_swaption_helper('5Y', '5Y', 0.0055, curve, fixed_leg_conventions, floating_leg_conventions)
 
 
 

@@ -77,13 +77,15 @@ def create_swap_rate_helpers(df: pd.DataFrame, fixed_leg_conventions: dict = Non
     floatingFrequency = floating_leg_conventions.get('frequency', ql.Period('6M'))
     fixedDayCount = fixed_leg_conventions.get('dayCount', ql.Thirty360(ql.Thirty360.BondBasis))
     floatingDayCount = floating_leg_conventions.get('dayCount', ql.Actual360())
+    floatingConvention = floating_leg_conventions.get('date_rolling_convention', ql.Following)
     floatingSettlementDays = floating_leg_conventions.get('settlement_days', 2)
+    floatingEndOfMonth = floating_leg_conventions.get('endOfMonth', False)
     calendar = floating_leg_conventions.get('calendar', ql.UnitedStates(ql.UnitedStates.Settlement))
     currency = floating_leg_conventions.get('currency', ql.USDCurrency())
     if currency == ql.EURCurrency():
         iborIndex = ql.Euribor(floatingFrequency)
     else:
-        iborIndex = ql.Libor('libor', floatingFrequency, floatingSettlementDays, currency, calendar, floatingDayCount)
+        iborIndex = ql.IborIndex('libor', floatingFrequency, floatingSettlementDays, currency, calendar, floatingConvention, floatingEndOfMonth, floatingDayCount)
 
     helpers = []
     for _, row in df.iterrows():

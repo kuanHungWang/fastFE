@@ -76,8 +76,7 @@ def bootstrap_curve(settlementDate, dayCount, deposit: Tuple=None, swap: Tuple=N
         helpers+=fra_helpers
 
     
-    for h in helpers:
-        print(h)
+        
     return bootstrap_curve_with_instrument_helpers(settlementDate, helpers, dayCount)
 
 def bootstrap_USD_curve(settlementDate, deposit: pd.DataFrame=None, swap: pd.DataFrame=None, OIS: pd.DataFrame=None, FRA: pd.DataFrame=None, method: Literal['logLinearDiscount', 'logCubicDiscount','linearZero','cubicZero', 'linearForward','splineCubicDiscount']='linearZero'):
@@ -184,3 +183,38 @@ def bootstrap_TWD_curve(settlementDate, deposit: pd.DataFrame=None, swap: pd.Dat
     
     return bootstrap_curve_with_instrument_helpers(settlementDate, helpers, dayCount)
     
+
+if __name__ == '__main__':
+        
+    df_deposit = pd.DataFrame({
+        'tenor': ['1M', '2M', '3M', '6M', '9M'],
+        'rates': [0.015, 0.018, 0.02, 0.022, 0.025]
+    })
+
+    df_swap = pd.DataFrame({
+        'rate': [0.015, 0.018, 0.02, 0.022, 0.025],
+        'tenor': ['1Y', '2Y', '5Y', '7Y', '10Y']
+    })
+    today = ql.Date().todaysDate()
+    deposit_helpers = create_USD_deposit_rate_helpers(df_deposit)
+    swap_helpers = create_USD_swap_rate_helpers(df_swap)
+    helpers = deposit_helpers + swap_helpers
+
+    curve = bootstrap_curve_with_instrument_helpers(today, deposit_helpers, ql.Actual360())
+
+
+    curve = bootstrap_curve(today, ql.Actual360(), deposit=(df_deposit, Conventions.USFixedLegConventions()), swap=(df_swap, Conventions.USFixedLegConventions(), Conventions.USFloatingLegConventions()))
+    curve = bootstrap_USD_curve(today, deposit=df_deposit, swap=df_swap)
+    curve = bootstrap_EUR_curve(today, deposit=df_deposit, swap=df_swap)
+    curve = bootstrap_JPY_curve(today, deposit=df_deposit, swap=df_swap)
+    curve = bootstrap_GBP_curve(today, deposit=df_deposit, swap=df_swap)
+    curve = bootstrap_TWD_curve(today, deposit=df_deposit, swap=df_swap)
+    schedule = ql.MakeSchedule(today, today + ql.Period(3, ql.Months), ql.Period('1W'))
+
+
+    print(curve.dayCounter())
+    for d in schedule:
+        print(f'{d}: {curve.zeroRate(d, curve.dayCounter(), ql.Simple).rate()}')
+
+
+
