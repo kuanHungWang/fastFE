@@ -263,102 +263,105 @@ def create_JPY_FRA_helpers(df: pd.DataFrame):
     conventions = Conventions.JPYFloatingLegConventions()
     return create_fra_rate_helpers(df, conventions)
 
-settlement_days = 2
-calendar = ql.TARGET()
-dayCount=ql.Actual360()
-date_rolling_convention = ql.ModifiedFollowing
-date_termination_convention = ql.ModifiedFollowing
-date_generation_rule = ql.DateGeneration.Backward
-date_end_of_month = False
 
-today = ql.Date().todaysDate()
-settlement = get_settlement_date(today, settlement_days, calendar)
+if __name__ == '__main__':
 
-conventions = {
-    'settlement_days': settlement_days,
-    'calendar': calendar,
-    'date_rolling_convention': date_rolling_convention,
-    'date_termination_convention': date_termination_convention,
-    'date_generation_rule': date_generation_rule,
-    'date_end_of_month': date_end_of_month,
-    'dayCounter': dayCount
-}
+    settlement_days = 2
+    calendar = ql.TARGET()
+    dayCount=ql.Actual360()
+    date_rolling_convention = ql.ModifiedFollowing
+    date_termination_convention = ql.ModifiedFollowing
+    date_generation_rule = ql.DateGeneration.Backward
+    date_end_of_month = False
 
+    today = ql.Date().todaysDate()
+    settlement = get_settlement_date(today, settlement_days, calendar)
 
-df_deposit = pd.DataFrame({
-    'tenor': ['1M', '2M', '3M', '6M', '1Y'],
-    'rates': [0.015, 0.018, 0.02, 0.022, 0.025]
-})
-
-df_fra = pd.DataFrame({
-    'monthsToStart': [1, 2, 3],
-    'monthsToEnd': [7, 8, 9],
-    'rates': [0.021, 0.023, 0.025]
-})
-
-df_swap = pd.DataFrame({
-    'rate': [0.015, 0.018, 0.02],
-    'tenor': ['5Y', '7Y', '10Y']
-})
-df_sofr = pd.DataFrame({
-    'price': [99.915, 99.920],
-    'month': [3, 6],
-    'year': [2020, 2020],
-    'frequency': [ql.Quarterly, ql.Quarterly]
-})
-df_OIS = pd.DataFrame({
-    'tenor': ['1M', '2M', '3M', '6M', '1Y'],
-    'rate': [0.015, 0.018, 0.02, 0.022, 0.025]
-})
-
-df_bond = pd.DataFrame({
-    'coupon': [0.015, 0.018],
-    'price': [99.915, 99.920],
-    'effectiveDate': [datetime(2020,1,15), datetime(2020,6,15)],
-    'terminationDate': [datetime(2025,1,15), datetime(2025,6,15)]
-})
-swap_helpers = create_swap_rate_helpers(df_swap, fixed_leg_conventions=Conventions.USFixedLegConventions(), floating_leg_conventions=Conventions.USFloatingLegConventions())
-deposit_helpers = create_deposit_rate_helpers(df_deposit)
-fra_helpers = create_fra_rate_helpers(df_fra)
-sofr_helpers = create_sofr_future_rate_helpers(df_sofr)
-oishelpers = create_OIS_helper(df_OIS)
-bond_helpers = create_bond_helper(df_bond)
+    conventions = {
+        'settlement_days': settlement_days,
+        'calendar': calendar,
+        'date_rolling_convention': date_rolling_convention,
+        'date_termination_convention': date_termination_convention,
+        'date_generation_rule': date_generation_rule,
+        'date_end_of_month': date_end_of_month,
+        'dayCounter': dayCount
+    }
 
 
+    df_deposit = pd.DataFrame({
+        'tenor': ['1M', '2M', '3M', '6M', '1Y'],
+        'rates': [0.015, 0.018, 0.02, 0.022, 0.025]
+    })
 
+    df_fra = pd.DataFrame({
+        'monthsToStart': [1, 2, 3],
+        'monthsToEnd': [7, 8, 9],
+        'rates': [0.021, 0.023, 0.025]
+    })
 
+    df_swap = pd.DataFrame({
+        'rate': [0.015, 0.018, 0.02],
+        'tenor': ['5Y', '7Y', '10Y']
+    })
+    df_sofr = pd.DataFrame({
+        'price': [99.915, 99.920],
+        'month': [3, 6],
+        'year': [2020, 2020],
+        'frequency': [ql.Quarterly, ql.Quarterly]
+    })
+    df_OIS = pd.DataFrame({
+        'tenor': ['1M', '2M', '3M', '6M', '1Y'],
+        'rate': [0.015, 0.018, 0.02, 0.022, 0.025]
+    })
 
+    df_bond = pd.DataFrame({
+        'coupon': [0.015, 0.018],
+        'price': [99.915, 99.920],
+        'effectiveDate': [datetime(2020,1,15), datetime(2020,6,15)],
+        'terminationDate': [datetime(2025,1,15), datetime(2025,6,15)]
+    })
+    swap_helpers = create_swap_rate_helpers(df_swap, fixed_leg_conventions=Conventions.USFixedLegConventions(), floating_leg_conventions=Conventions.USFloatingLegConventions())
+    deposit_helpers = create_deposit_rate_helpers(df_deposit)
+    fra_helpers = create_fra_rate_helpers(df_fra)
+    sofr_helpers = create_sofr_future_rate_helpers(df_sofr)
+    oishelpers = create_OIS_helper(df_OIS)
+    bond_helpers = create_bond_helper(df_bond)
 
 
 
-create_USD_deposit_rate_helpers(df_deposit)
-create_EUR_deposit_rate_helpers(df_deposit)
-create_CHF_deposit_rate_helpers(df_deposit)
 
-# Example usage for SofrFutureRateHelper
 
-create_USD_deposit_rate_helpers(df_deposit)
-create_EUR_deposit_rate_helpers(df_deposit)
-create_JPY_deposit_rate_helpers(df_deposit)
-create_TWDeposit_rate_helpers(df_deposit)
-create_CHF_deposit_rate_helpers(df_deposit)
-create_GBP_deposit_rate_helpers(df_deposit)
 
-create_USD_swap_rate_helpers(df_swap)
-create_EUR_swap_rate_helpers(df_swap)
-create_JPY_swap_rate_helpers(df_swap)
-create_TWD_swap_rate_helpers(df_swap)
-create_CHF_swap_rate_helpers(df_swap)
-create_GBP_swap_rate_helpers(df_swap)
-create_EUR_OIS_helpers(df_OIS)
-create_GBP_OIS_helpers(df_OIS)
-create_JPY_OIS_helpers(df_OIS)
-create_CHF_OIS_helpers(df_OIS)
 
-create_USD_FRA_helpers(df_fra)
-create_EUR_FRA_helpers(df_fra)
-create_CHF_FRA_helpers(df_fra)
-create_GBP_FRA_helpers(df_fra)
-create_JPY_FRA_helpers(df_fra)
+
+    create_USD_deposit_rate_helpers(df_deposit)
+    create_EUR_deposit_rate_helpers(df_deposit)
+    create_CHF_deposit_rate_helpers(df_deposit)
+
+    # Example usage for SofrFutureRateHelper
+
+    create_USD_deposit_rate_helpers(df_deposit)
+    create_EUR_deposit_rate_helpers(df_deposit)
+    create_JPY_deposit_rate_helpers(df_deposit)
+    create_TWDeposit_rate_helpers(df_deposit)
+    create_CHF_deposit_rate_helpers(df_deposit)
+    create_GBP_deposit_rate_helpers(df_deposit)
+
+    create_USD_swap_rate_helpers(df_swap)
+    create_EUR_swap_rate_helpers(df_swap)
+    create_JPY_swap_rate_helpers(df_swap)
+    create_TWD_swap_rate_helpers(df_swap)
+    create_CHF_swap_rate_helpers(df_swap)
+    create_GBP_swap_rate_helpers(df_swap)
+    create_EUR_OIS_helpers(df_OIS)
+    create_GBP_OIS_helpers(df_OIS)
+    create_JPY_OIS_helpers(df_OIS)
+    create_CHF_OIS_helpers(df_OIS)
+
+    create_USD_FRA_helpers(df_fra)
+    create_EUR_FRA_helpers(df_fra)
+    create_CHF_FRA_helpers(df_fra)
+    create_GBP_FRA_helpers(df_fra)
+    create_JPY_FRA_helpers(df_fra)
 
 

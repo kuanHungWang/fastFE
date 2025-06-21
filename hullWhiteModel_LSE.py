@@ -24,6 +24,7 @@ def combine_schedule(*schedules):
 calendar = ql.TARGET()
 dayCount=ql.Actual360()
 today = ql.Date().todaysDate()
+today = calendar.advance(today,ql.Period(0, ql.Days))
 settlement = calendar.advance(today,ql.Period(2, ql.Days))
 ql.Settings.instance().evaluationDate = today
 
@@ -73,6 +74,7 @@ print(f'Calibration of hull-white model: a={a}, sigma={sigma}')
 # create schedule
 calendar = ql.TARGET()
 today = ql.Date().todaysDate()
+
 settlement = calendar.advance(today,ql.Period(2, ql.Days))
 terminationDate = calendar.advance(today,ql.Period(3, ql.Years))
 frequency = ql.Period('6M')

@@ -5,7 +5,7 @@ FIXED_LEG_CONVENTIONS = {
     'frequency': ql.Annual,
     'date_rolling_convention': ql.ModifiedFollowing,
     'date_termination_convention': ql.ModifiedFollowing,
-    'rule': ql.DateGeneration.Backward,
+    'rule': ql.DateGeneration.Forward,
     'endOfMonth': False,
     'dayCounter': ql.Thirty360(ql.Thirty360.ISDA),
     'settlement_days': 2
@@ -14,7 +14,7 @@ FLOATING_LEG_CONVENTIONS = {
     'frequency': ql.Period('6M'),
     'date_rolling_convention': ql.ModifiedFollowing,
     'date_termination_convention': ql.ModifiedFollowing,
-    'rule': ql.DateGeneration.Backward,
+    'rule': ql.DateGeneration.Forward,
     'endOfMonth': False,
     'dayCounter': ql.Actual360(),
     'settlement_days': 2
@@ -25,7 +25,7 @@ class Conventions:
     def USFixedLegConventions(cls):
         conventions = FIXED_LEG_CONVENTIONS.copy()
         conventions['calendar'] = ql.UnitedStates(ql.UnitedStates.Settlement)
-        conventions['currency   '] = ql.USDCurrency()
+        conventions['currency'] = ql.USDCurrency()
         return conventions
 
     @classmethod

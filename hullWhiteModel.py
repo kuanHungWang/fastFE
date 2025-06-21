@@ -24,6 +24,7 @@ def combine_schedule(*schedules):
 calendar = ql.TARGET()
 dayCount=ql.Actual360()
 today = ql.Date().todaysDate()
+today = calendar.advance(today,ql.Period(0, ql.Days))
 settlement = calendar.advance(today,ql.Period(2, ql.Days))
 ql.Settings.instance().evaluationDate = today
 
@@ -32,7 +33,7 @@ ql.Settings.instance().evaluationDate = today
 dates = [calendar.advance(settlement,ql.Period(y, ql.Years)) for y in [0, 1, 2, 3,4,5,10]]
 zeros = [0.015, 0.018, 0.02, 0.022, .025, .03, .035]
 
-curve = ql.ZeroCurve(dates, zeros, ql.Actual360(), ql.TARGET())
+curve = ql.ZeroCurve(dates, zeros, dayCount, ql.TARGET())
 term_structure = ql.YieldTermStructureHandle(curve)
 
 # calibrate parametors of hull-white model from swaptions

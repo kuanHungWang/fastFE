@@ -77,6 +77,47 @@ def create_TWD_swaption_helpers(df: pd.DataFrame, curve, engine=None):
     floating_leg_conventions = Conventions.TWDFloatingLegConventions()
     return create_swaption_helper(df, curve, engine, fixed_leg_conventions, floating_leg_conventions)
     
+if __name__ == '__main__':
+    from curve_builder import bootstrap_USD_curve
+    df_deposit = pd.DataFrame({
+    'tenor': ['1M', '2M', '3M', '6M', '9M'],
+    'rates': [0.015, 0.018, 0.02, 0.022, 0.025]
+    })
 
+    df_swap = pd.DataFrame({
+        'rate': [0.015, 0.018, 0.02, 0.022, 0.025],
+        'tenor': ['1Y', '2Y', '5Y', '7Y', '10Y']
+    })
+    today = ql.Date().todaysDate()
+
+    curve = bootstrap_USD_curve(today, deposit=df_deposit, swap=df_swap)
+
+    fixed_leg_conventions = Conventions.USFixedLegConventions()
+    fixed_leg_conventions['tenor'] = ql.Period('1Y')
+    floating_leg_conventions = Conventions.USFloatingLegConventions()
+
+
+    df_swaption = pd.DataFrame({
+        'maturity': ['2Y', '3Y'],
+        'length': ['5Y', '5Y'],
+        'volatility': [0.0055, 0.0055]
+    })
+    term_structure = ql.YieldTermStructureHandle(curve)
+
+    model = ql.HullWhite(term_structure);
+    engine = ql.JamshidianSwaptionEngine(model)
+    swaption_helpers = create_swaption_helper(df_swaption, curve, engine, fixed_leg_conventions, floating_leg_conventions)
+    swaption_helpers = create_USD_swaption_helpers(df_swaption, curve, engine)
+    swaption_helpers = create_EUR_swaption_helpers(df_swaption, curve, engine)
+    swaption_helpers = create_JPY_swaption_helpers(df_swaption, curve, engine)
+    swaption_helpers = create_GBP_swaption_helpers(df_swaption, curve, engine)
+    swaption_helpers = create_CHF_swaption_helpers(df_swaption, curve, engine)
+    swaption_helpers = create_TWD_swaption_helpers(df_swaption, curve, engine)
+
+    optimization_method = ql.LevenbergMarquardt(1.0e-8,1.0e-8,1.0e-8)
+    end_criteria = ql.EndCriteria(10000, 100, 1e-6, 1e-8, 1e-8)
+    model.calibrate(swaption_helpers, optimization_method, end_criteria)
+
+    print(model.params())    
 
 

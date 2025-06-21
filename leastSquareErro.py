@@ -195,6 +195,7 @@ endOfMonth = False
 
 
 today = ql.Date().todaysDate()
+today = ql.Date(19, 6, 2025)
 settlement = get_settlement_date(today, settlement_days, calendar)
 ql.Settings.instance().evaluationDate = today
 
