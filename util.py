@@ -95,7 +95,7 @@ def create_swap_rate_helpers(df: pd.DataFrame, fixed_leg_conventions: dict = Non
         helpers.append(helper)
     return helpers
 
-def create_sofr_future_rate_helpers(df: pd.DataFrame):
+def create_sofr_future_rate_helpers(df: pd.DataFrame, conventions: dict = None):
     """
     Create a list of QuantLib SofrFutureRateHelper objects from a DataFrame.
     The DataFrame must have columns: 'price' (float), 'month' (int), 'year' (int), 'frequency' (QuantLib frequency).
@@ -447,6 +447,25 @@ def create_CHF_OIS_helpers(df: pd.DataFrame):
     conventions = Conventions.CHFOISConventions()
     return create_OIS_helper(df, conventions)
 
+def create_USD_FRA_helpers(df: pd.DataFrame):
+    conventions = Conventions.USFloatingLegConventions()
+    return create_fra_rate_helpers(df, conventions)
+
+def create_EUR_FRA_helpers(df: pd.DataFrame):
+    conventions = Conventions.EURFloatingLegConventions()
+    return create_fra_rate_helpers(df, conventions)
+
+def create_CHF_FRA_helpers(df: pd.DataFrame):
+    conventions = Conventions.CHFFloatingLegConventions()
+    return create_fra_rate_helpers(df, conventions)
+
+def create_GBP_FRA_helpers(df: pd.DataFrame):
+    conventions = Conventions.GBPFloatingLegConventions()
+    return create_fra_rate_helpers(df, conventions)
+
+def create_JPY_FRA_helpers(df: pd.DataFrame):
+    conventions = Conventions.JPYFloatingLegConventions()
+    return create_fra_rate_helpers(df, conventions)
 
 settlement_days = 2
 calendar = ql.TARGET()
@@ -519,6 +538,7 @@ bond_helpers = create_bond_helper(df_bond)
 create_USD_deposit_rate_helpers(df_deposit)
 create_EUR_deposit_rate_helpers(df_deposit)
 create_CHF_deposit_rate_helpers(df_deposit)
+
 # Example usage for SofrFutureRateHelper
 
 create_USD_deposit_rate_helpers(df_deposit)
@@ -539,8 +559,10 @@ create_GBP_OIS_helpers(df_OIS)
 create_JPY_OIS_helpers(df_OIS)
 create_CHF_OIS_helpers(df_OIS)
 
-
-
-
+create_USD_FRA_helpers(df_fra)
+create_EUR_FRA_helpers(df_fra)
+create_CHF_FRA_helpers(df_fra)
+create_GBP_FRA_helpers(df_fra)
+create_JPY_FRA_helpers(df_fra)
 
 
