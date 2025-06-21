@@ -43,9 +43,12 @@ fixed_leg_conventions['tenor'] = ql.Period('1Y')
 floating_leg_conventions = Conventions.USFloatingLegConventions()
 
 
-def create_swaption_helper(maturity, length, volatility, curve, fixed_leg_conventions, floating_leg_conventions):
-    # fixedFrequency = fixed_leg_conventions.get('frequency', ql.Annual)
-    # fixedConvention = fixed_leg_conventions.get('date_rolling_convention', ql.Following)
+def create_swaption_helper(df, curve, engine=None, fixed_leg_conventions=None, floating_leg_conventions=None):
+    if fixed_leg_conventions is None:
+        fixed_leg_conventions = Conventions.USFixedLegConventions()
+    if floating_leg_conventions is None:
+        floating_leg_conventions = Conventions.USFloatingLegConventions()
+
     fixedLegTenor = fixed_leg_conventions.get('tenor', ql.Period('1Y'))
     floatingFrequency = floating_leg_conventions.get('frequency', ql.Period('6M'))
     fixedDayCount = fixed_leg_conventions.get('dayCount', ql.Thirty360(ql.Thirty360.BondBasis))
@@ -56,20 +59,41 @@ def create_swaption_helper(maturity, length, volatility, curve, fixed_leg_conven
     calendar = floating_leg_conventions.get('calendar', ql.UnitedStates(ql.UnitedStates.Settlement))
     currency = floating_leg_conventions.get('currency', ql.USDCurrency())
 
+    helpers = []
+    for _, row in df.iterrows():
+        maturity = row['maturity']
+        length = row['length']
+        volatility = row['volatility']
+        maturity = ql.Period(maturity)
+        length = ql.Period(length)
+        volatility = ql.QuoteHandle(ql.SimpleQuote(volatility))
 
-    maturity = ql.Period(maturity)
-    length = ql.Period(length)
-    volatility = ql.QuoteHandle(ql.SimpleQuote(volatility))
-    index = ql.IborIndex('iborIndex', floatingFrequency, floatingSettlementDays, currency, calendar, floatingConvention, floatingEndOfMonth, floatingDayCount)
+        yts = ql.YieldTermStructureHandle(curve)
+        index = ql.IborIndex('iborIndex', floatingFrequency, floatingSettlementDays, currency, calendar, floatingConvention, floatingEndOfMonth, floatingDayCount, yts)
 
-    yts = ql.YieldTermStructureHandle(curve)
 
-    return ql.SwaptionHelper(
-    maturity, length, volatility, index, fixedLegTenor,
-    fixedDayCount, floatingDayCount, yts
-    )
+        helper= ql.SwaptionHelper(
+        maturity, length, volatility, index, fixedLegTenor,
+        fixedDayCount, floatingDayCount, yts
+        )
+        if engine is not None:
+            helper.setPricingEngine(engine)
+        helpers.append(helper)
+    return helpers
+df_swaption = pd.DataFrame({
+    'maturity': ['2Y', '3Y'],
+    'length': ['5Y', '5Y'],
+    'volatility': [0.0055, 0.0055]
+})
+term_structure = ql.YieldTermStructureHandle(curve)
 
-create_swaption_helper('5Y', '5Y', 0.0055, curve, fixed_leg_conventions, floating_leg_conventions)
+model = ql.HullWhite(term_structure);
+engine = ql.JamshidianSwaptionEngine(model)
+swaption_helpers = create_swaption_helper(df_swaption, curve, engine, fixed_leg_conventions, floating_leg_conventions)
+
+optimization_method = ql.LevenbergMarquardt(1.0e-8,1.0e-8,1.0e-8)
+end_criteria = ql.EndCriteria(10000, 100, 1e-6, 1e-8, 1e-8)
+model.calibrate(swaption_helpers, optimization_method, end_criteria)
 
 
 
