@@ -28,8 +28,6 @@ def create_swaption_helper(df, curve, engine=None, fixed_leg_conventions=None, f
 
         yts = ql.YieldTermStructureHandle(curve)
         index = ql.IborIndex('iborIndex', floatingFrequency, floatingSettlementDays, currency, calendar, floatingConvention, floatingEndOfMonth, floatingDayCount, yts)
-
-
         helper= ql.SwaptionHelper(
         maturity, length, volatility, index, fixedLegTenor,
         fixedDayCount, floatingDayCount, yts

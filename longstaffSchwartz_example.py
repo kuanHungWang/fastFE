@@ -293,15 +293,6 @@ exercise_payoff = lambda x: np.zeros(shape_single_step)
 survival = np.ones((len(exercise_dates), numPaths), dtype=bool)
 survival = pd.DataFrame(survival, index=exercise_dates)
 
-
-
-
-
-
-
-
-
-
         
 
 # OOP version of Longstaff-Schwartz

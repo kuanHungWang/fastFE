@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 from typing import List, Callable
 from sklearn import linear_model
+from util import get_nearest_fixing_date, year_fraction
 
 class LongstaffSchwartz():
     def __init__(self, cashflows: pd.DataFrame, 

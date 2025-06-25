@@ -32,7 +32,7 @@ class HullWhiteModel():
         model.calibrate(helpers, optimization_method, end_criteria)
         self.model = model
 
-    def monte_carlo_paths(self,  index_factory, fixingSchedule, paymentSchedule, numPaths):
+    def monte_carlo_paths(self,  index_factories, fixingSchedule, paymentSchedule, numPaths):
         a, sigma = self.model.params()
         term_structure = ql.YieldTermStructureHandle(self.curve)
         process = ql.HullWhiteProcess(term_structure, a, sigma)
@@ -55,7 +55,7 @@ class HullWhiteModel():
 
         underlying_path = []
         forward_curves=[]
-        fixings = []
+        fixings_list = [[] for _ in index_factories]
         discountFactors = []
         for i in range(numPaths):
             samplePath = pathGenerator.next()
@@ -66,13 +66,14 @@ class HullWhiteModel():
             fwd_crv = ql.ForwardCurve([d for d in all_dates], underlying, dayCount)
             # print(f'fwd_crv start date: {fwd_crv.dates()[0]}, end date: {fwd_crv.dates()[-1]}')
             ts = ql.YieldTermStructureHandle(fwd_crv)
-            index=index_factory(ts)
-            fixings.append([index.fixing(d) for d in fixingSchedule])
+            for index_factory, fixings in zip(index_factories, fixings_list):
+                index=index_factory(ts)
+                fixings.append([index.fixing(d) for d in fixingSchedule])
             discountFactors.append([fwd_crv.discount(d) for d in paymentSchedule])
             forward_curves.append(fwd_crv)
             
         underlying_path = np.array(underlying_path).transpose()
-        fixings = np.array(fixings).transpose()
+        fixings_list = [np.array(fixings).transpose() for fixings in fixings_list]
         discountFactors = np.array(discountFactors).transpose()
 
         # Helper to convert QuantLib Dates to Python date
@@ -86,10 +87,10 @@ class HullWhiteModel():
 
         # Convert to DataFrames with appropriate indices
         underlying_path_df = pd.DataFrame(underlying_path, index=[d for d in all_dates])
-        fixings_df = pd.DataFrame(fixings, index=[d for d in fixingSchedule])
+        fixings_dfs = [pd.DataFrame(fixings, index=[d for d in fixingSchedule]) for fixings in fixings_list]
         discountFactors_df = pd.DataFrame(discountFactors, index=[d for d in paymentSchedule])
 
-        return underlying_path_df, fixings_df, discountFactors_df
+        return underlying_path_df, fixings_dfs, discountFactors_df
 
 
 
