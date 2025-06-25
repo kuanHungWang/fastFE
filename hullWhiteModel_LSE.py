@@ -27,14 +27,22 @@ today = ql.Date().todaysDate()
 today = calendar.advance(today,ql.Period(0, ql.Days))
 settlement = calendar.advance(today,ql.Period(2, ql.Days))
 ql.Settings.instance().evaluationDate = today
-
+print(f'today: {today}, settlement: {settlement}')
 # termstructure from zero rates
 # todo: bootstrap yield curve from instruments.
 dates = [calendar.advance(settlement,ql.Period(y, ql.Years)) for y in [0, 1, 2, 3,4,5,10]]
 zeros = [0.015, 0.018, 0.02, 0.022, .025, .03, .035]
 
-curve = ql.ZeroCurve(dates, zeros, ql.Actual360(), ql.TARGET())
+curve = ql.ZeroCurve(dates, zeros, dayCount, calendar)
 term_structure = ql.YieldTermStructureHandle(curve)
+
+reference_date = curve.referenceDate()  # or use 'settlement' if that's your convention
+max_date = curve.maxDate()
+max_time = dayCount.yearFraction(reference_date, max_date)
+print(f"Curve max time (years): {max_time}")
+print(f"Curve reference date: {reference_date}")
+print(f"Curve max date: {max_date}")
+
 
 # calibrate parametors of hull-white model from swaptions
 index = ql.Euribor1Y(term_structure)
@@ -104,7 +112,7 @@ process = ql.HullWhiteProcess(term_structure, a, sigma)
 
 # As hull-white model is a short rate model, underlying rate must generate every day, not only fixing dates.
 frequency = ql.Period('1d')
-all_dates = ql.Schedule(settlement, curve.maxDate(), frequency, calendar, convention, terminationDateConvention, rule, endOfMonth)
+all_dates = ql.Schedule(settlement, curve.maxDate()-ql.Period(10,ql.Days), frequency, calendar, convention, terminationDateConvention, rule, endOfMonth)
 
 
 timestep, length, numPaths = 24, 2, 2**2

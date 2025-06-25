@@ -233,10 +233,6 @@ for fixing_date, pay_date in zip(fixingSchedule, paymentSchedule):
 
 swaptions=pd.DataFrame(dict(start=[1,2,3,4,5], length=[5,4,3,2,1], volatility=[0.1148,0.1108,0.1070,0.1021,0.1000]))
 
-
-
-
-
 a, sigma = calibrate_hull_white_model(term_structure, swaptions)
 
 # HullWhiteProcess

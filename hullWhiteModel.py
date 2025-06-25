@@ -24,6 +24,7 @@ def combine_schedule(*schedules):
 calendar = ql.TARGET()
 dayCount=ql.Actual360()
 today = ql.Date().todaysDate()
+today = ql.Date(19, 6, 2025)
 today = calendar.advance(today,ql.Period(0, ql.Days))
 settlement = calendar.advance(today,ql.Period(2, ql.Days))
 ql.Settings.instance().evaluationDate = today
@@ -33,8 +34,23 @@ ql.Settings.instance().evaluationDate = today
 dates = [calendar.advance(settlement,ql.Period(y, ql.Years)) for y in [0, 1, 2, 3,4,5,10]]
 zeros = [0.015, 0.018, 0.02, 0.022, .025, .03, .035]
 
-curve = ql.ZeroCurve(dates, zeros, dayCount, ql.TARGET())
+curve = ql.ZeroCurve(dates, zeros, dayCount, calendar)
 term_structure = ql.YieldTermStructureHandle(curve)
+
+
+# Assume 'curve' is your QuantLib YieldTermStructure object
+# and 'settlement' is your simulation start date
+
+dayCount = curve.dayCounter()
+max_date = curve.maxDate()
+reference_date = curve.referenceDate()  # or use 'settlement' if that's your convention
+
+max_time = dayCount.yearFraction(reference_date, max_date)
+print(f"Curve max time (years): {max_time}")
+print(f"Curve reference date: {reference_date}")
+print(f"Curve max date: {max_date}")
+
+
 
 # calibrate parametors of hull-white model from swaptions
 index = ql.Euribor1Y(term_structure)
@@ -90,10 +106,10 @@ paySchedule = [d for d in paySchedule]
 recSchedule = [d for d in recSchedule]
 
 fixingSchedule = [calendar.advance(d,ql.Period(-2, ql.Days)) for d in paymentSchedule]
-print(f'today: {today}, settlement: {settlement}')
-print('Fixing date, Payment date')
-for fixing_date, pay_date in zip(fixingSchedule, paymentSchedule):
-    print(f"{fixing_date.year()}-{fixing_date.month()}-{fixing_date.dayOfMonth()}, {pay_date.year()}-{pay_date.month()}-{pay_date.dayOfMonth()}")
+# print(f'today: {today}, settlement: {settlement}')
+# print('Fixing date, Payment date')
+# for fixing_date, pay_date in zip(fixingSchedule, paymentSchedule):
+#     print(f"{fixing_date.year()}-{fixing_date.month()}-{fixing_date.dayOfMonth()}, {pay_date.year()}-{pay_date.month()}-{pay_date.dayOfMonth()}")
 
 
 # HullWhiteProcess
@@ -105,6 +121,9 @@ process = ql.HullWhiteProcess(term_structure, a, sigma)
 frequency = ql.Period('1d')
 all_dates = ql.Schedule(settlement, curve.maxDate(), frequency, calendar, convention, terminationDateConvention, rule, endOfMonth)
 
+print(f'all_dates: first date: {all_dates[0]}, last date: {all_dates[-1]}')
+print(f'time in year:{dayCount.yearFraction(all_dates[0], all_dates[-1])}')
+
 
 timestep, length, numPaths = 24, 2, 2**2
 dimension = process.factors()
@@ -113,6 +132,8 @@ time_grid = year_fraction(all_dates, dayCount, accoumulative=True)
 rng = ql.UniformRandomSequenceGenerator(dimension * n_steps, ql.UniformRandomGenerator())
 sequenceGenerator = ql.GaussianRandomSequenceGenerator(rng)
 pathGenerator = ql.GaussianMultiPathGenerator(process, time_grid, sequenceGenerator, False)
+
+
 
 
 underlying_path = []
@@ -255,7 +276,7 @@ for d in reversed(net_cashflows_df.index):
         reg.fit(x, valuation)
         y = reg.predict(x)
         print(f'Estimated next period valuation: {y}')
-        exe_payoff = exercise_payoff(observations.loc[d,:].values)
+        exe_payoff = exercise_payoff(observations.loc[nearest_fixing_date,:].values)
         print(f'payoff of early exercise: {exe_payoff}')
         not_exercise = y > exe_payoff
         exercise = y < exe_payoff
