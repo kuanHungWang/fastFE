@@ -91,7 +91,7 @@ paySchedule = ql.Schedule(settlementDate, terminationDate, frequency, calendar, 
 recSchedule = ql.Schedule(settlementDate, terminationDate, frequency, calendar, date_rolling_convention, date_termination_convention, rule, endOfMonth)
 paymentSchedule = combine_schedule(paySchedule, recSchedule)
 
-fixingSchedule = ql.Schedule(settlementDate, terminationDate, ql.Period('1D'), calendar, ql.Following, ql.Following, rule, endOfMonth)
+fixingSchedule = ql.Schedule(today, terminationDate, ql.Period('1D'), calendar, ql.Following, ql.Following, rule, endOfMonth)
 all_dates = ql.Schedule(settlementDate, terminationDate, ql.Period('1D'), ql.NullCalendar(), ql.Following, ql.Following, ql.DateGeneration.Backward, False)
 
 n_path = 2**2
@@ -103,7 +103,7 @@ def create_ibor_6M(ts):
     return ql.IborIndex('MyIndex', ql.Period('6m'), 2, currency, calendar, date_rolling_convention, True, dayCount, ts)
 
 
-underlying_path, fixings, discountFactors = hw_model.monte_carlo_paths(create_2Y_CMS, fixingSchedule, paymentSchedule, n_path)
+underlying_path, fixings, discountFactors = hw_model.monte_carlo_paths([create_2Y_CMS, create_ibor_6M], fixingSchedule, paymentSchedule, n_path)
 # underlying_path, fixings, discountFactors are dataframes with index of ql.Date.
 
 
@@ -126,7 +126,7 @@ recSchedule = [d for d in recSchedule]
 year_fraction_rec = np.array(year_fraction(recSchedule, dayCount, accoumulative=False))
 fixed_cashflows = pd.DataFrame(notional * fixed_rate * year_fraction_rec, index=recSchedule)
 print(f'\nfixed_cashflows: \n{fixed_cashflows}')
-print(f'\nfixings: \n{fixings.mean(axis=1)}')
+print(f'\nfixings: \n{fixings}')
 
 # range acrual cashflows
 
@@ -140,9 +140,10 @@ rate = 0.03
 acruals=[]
 notional = 1_000_000
 range_acrual_cashflows = pd.DataFrame(np.zeros((len(paySchedule),n_path)),index = paySchedule)
+cms_fixings = fixings[0]
 for d in paySchedule[1:]:
     end_date = d
-    period_fixing=fixings.loc[(fixings.index>start_date)&(fixings.index<=end_date)].copy()  # get fixing rates withing accrual period
+    period_fixing=cms_fixings.loc[(cms_fixings.index>start_date)&(cms_fixings.index<=end_date)].copy()  # get fixing rates withing accrual period
     period_fixing.iloc[-last_n:] = period_fixing.iloc[-1]   # replace last 5 days with last day 
     in_range_days=(period_fixing>lower_bound)&(period_fixing<upper_bound)  # Calculate bool value representing days that is withing range.
     accrual = in_range_days.mean(axis=0)   # Calculate accrual ratio.
@@ -157,9 +158,14 @@ print(f'\nrange_acrual_cashflows: \n{range_acrual_cashflows}')
     
 
 # floating cashflows
-fixing_date_map = pd.Series(fixingSchedule, index=paymentSchedule)
+libor_fixings = fixings[1]
+libor_fixing_schedule = [calendar.advance(d,ql.Period(-2, ql.Days)) for d in paymentSchedule]
+print(f'\nlibor_fixings: \n{len(libor_fixings)}')
+fixing_date_map = pd.Series(libor_fixing_schedule, index=paymentSchedule)
+print(f'\nfixing_date_map: \n{fixing_date_map}')
 fixing_date = fixing_date_map[paySchedule]   # 1. get fixing date from map
-fixing_value = pd.DataFrame(fixings.loc[fixing_date].values, index=paySchedule) # 2. get fixing value from fixings with corresponding fixing date
+print(f'\nfixing_date: \n{fixing_date}')
+fixing_value = pd.DataFrame(libor_fixings.loc[fixing_date].values, index=paySchedule) # 2. get fixing value from fixings with corresponding fixing date
 fixing_in_advance = True  # 3. process fixing-in-advance case if True
 if fixing_in_advance:
     fixing_value = fixing_value.shift(1)
@@ -185,7 +191,7 @@ print(f'\nsingle_period_dcf: \n {single_period_dcf}')
 exercise_dates = paymentSchedule[1:-1]
 exercisable = subset_to_bool(exercise_dates, net_cashflows.index)
 print('\n call schedule: \n',exercisable)
-observations = fixings  # observation is for linear estimator of longstaff schwartz, irelevant of fixing-in-advance or fixing-in-arrears
+observations = cms_fixings  # observation is for linear estimator of longstaff schwartz, irelevant of fixing-in-advance or fixing-in-arrears
 print('\n Observations(fixing of 6m libor rate): \n',observations)
 exercise_payoff = lambda x: np.zeros(len(x))
 lse = LongstaffSchwartz(
