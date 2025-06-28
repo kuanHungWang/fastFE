@@ -69,6 +69,16 @@ def create_swap_rate_helpers(df: pd.DataFrame, fixed_leg_conventions: dict = Non
     conventions (dict): Must include 'calendar'. Other keys (optional): 'fixedFrequency', 'fixedConvention', 'fixedDayCount', 'iborIndex'.
     Example: {'calendar': ql.TARGET(), ...}
     """
+    try:
+        # add one year to the last tenor in case of bootstrap or calibration failure
+        last_row = df.iloc[-1]
+        last_tenor = last_row['tenor']
+        tenor_plus_one_year = f"{int(last_tenor[:-1]) + 1}Y"
+        padding_raw = last_row.copy()
+        padding_raw['tenor'] = tenor_plus_one_year
+        df = df._append(padding_raw, ignore_index=True)
+    except:
+        print("Failed to add one year to the last tenor, using original data.")
     if fixed_leg_conventions is None:
         fixed_leg_conventions = {}
     if floating_leg_conventions is None:

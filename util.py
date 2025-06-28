@@ -1,6 +1,15 @@
 import QuantLib as ql
 import pandas as pd
 
+def subset_to_bool(subset_dates, full_dates)->pd.Series:
+    """
+    Return a boolean Series indexed by full_dates, True where the date is in subset_dates, False otherwise.
+    subset_dates: list-like or index-like, must be a subset of full_dates
+    full_dates: list-like or index-like
+    """
+    subset_set = set(subset_dates)
+    return pd.Series([date in subset_set for date in full_dates], index=full_dates)
+    
 def get_nearest_fixing_date(d, obs_index):
     # Returns the greatest date in obs_index that is <= d
     return max([date for date in obs_index if date <= d])

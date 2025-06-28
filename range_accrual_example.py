@@ -1,15 +1,8 @@
 import QuantLib as ql
 import numpy as np
 import pandas as pd
-from util import leg_to_series
-def subset_to_bool(subset_dates, full_dates)->pd.Series:
-    """
-    Return a boolean Series indexed by full_dates, True where the date is in subset_dates, False otherwise.
-    subset_dates: list-like or index-like, must be a subset of full_dates
-    full_dates: list-like or index-like
-    """
-    subset_set = set(subset_dates)
-    return pd.Series([date in subset_set for date in full_dates], index=full_dates)
+from util import leg_to_series, subset_to_bool
+
 from datetime import datetime
 from rate_helpers import (
     create_USD_deposit_rate_helpers,
@@ -74,7 +67,7 @@ df_swap = pd.DataFrame({
 
 # swaption data
 df_swaption = pd.DataFrame({
-    'maturity': ['2Y', '3Y', '5Y', '7Y', '10Y', '15Y', '20Y', '20Y'],
+    'maturity': ['2Y', '3Y', '5Y', '7Y', '10Y', '15Y', '20Y', '25Y'],
     'length': ['5Y', '5Y', '5Y', '5Y', '5Y', '5Y', '5Y', '5Y'],
     'volatility': [0.13, 0.21, 0.12, 0.14, 0.13, 0.07, 0.06, 0.05]
 })
