@@ -28,6 +28,7 @@ from util import get_nearest_fixing_date, year_fraction, combine_schedule
 from leastSquareError import LongstaffSchwartz
 from models import HullWhiteModel
 
+from market_data import (get_deposit, get_swap, get_swaption, get_FRA, get_sofr_future)
 
 # conventions
 fixed_leg_conventions = Conventions.USFixedLegConventions()
@@ -50,22 +51,11 @@ print(f' trade date: {today}')
 print(f' settlement date: {settlementDate}')
 
 # prepare market data for curve and model calibration
-df_deposit = pd.DataFrame({
-'tenor': ['1M', '2M', '3M', '6M', '9M'],
-'rates': [0.015, 0.018, 0.02, 0.022, 0.025]
-})
-
-df_swap = pd.DataFrame({
-    'rate': [0.015, 0.018, 0.02, 0.022, 0.025],
-    'tenor': ['1Y', '2Y', '5Y', '7Y', '10Y']
-})
+df_deposit = get_deposit(['1M', '2M', '3M', '6M', '9M'])
+df_swap = get_swap(['1Y', '2Y', '5Y', '7Y', '10Y', '15Y', '20Y', '25Y', '30Y'])
 
 # swaption data
-df_swaption = pd.DataFrame({
-    'maturity': ['2Y', '3Y'],
-    'length': ['5Y', '5Y'],
-    'volatility': [0.0055, 0.0055]
-})
+df_swaption = get_swaption(['2Y', '3Y'], ['5Y', '5Y'])
 
 
 # create curve and calibrate model by swaptions
