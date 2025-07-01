@@ -13,6 +13,12 @@ from vol_helper import (
 )
 from util import year_fraction
 
+def calibration_detail(helpers):
+    modelValues = [helper.modelValue() for helper in helpers]
+    marketValues = [helper.marketValue() for helper in helpers]
+    calibrationErrors = [helper.calibrationError() for helper in helpers]
+    return pd.DataFrame({'modelValue': modelValues, 'marketValue': marketValues, 'calibrationError': calibrationErrors})
+
 class HullWhiteModel():
     def __init__(self, settlementDate, curve, currency):
         self.curve = curve
@@ -32,6 +38,12 @@ class HullWhiteModel():
         end_criteria = ql.EndCriteria(10000, 100, 1e-6, 1e-8, 1e-8)
         model.calibrate(helpers, optimization_method, end_criteria)
         self.model = model
+        try:
+            self.calibration_detail = calibration_detail(helpers)
+        except:
+            self.calibration_error = None
+
+
 
     def monte_carlo_paths(self,  index_factories, fixingSchedule, paymentSchedule, numPaths):
         a, sigma = self.model.params()
@@ -119,6 +131,10 @@ class HestonModel():
         endCriteria=ql.EndCriteria(500, 300, 1.0e-8,1.0e-8, 1.0e-8)
         model.calibrate(helpers, lm, endCriteria)
         self.model = model
+        try:
+            self.calibration_detail = calibration_detail(helpers)
+        except:
+            self.calibration_detail = None
 
     def monte_carlo_paths(self, spot:float, fixingSchedule:ql.Schedule, numPaths:int):
         """
@@ -187,6 +203,7 @@ if __name__ == '__main__':
     paths = heston_model.monte_carlo_paths(spot, fixingSchedule, 2**2)
     print([d for d in fixingSchedule])
     print(paths)
+    print(heston_model.calibration_detail)
         
 
 
