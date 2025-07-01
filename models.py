@@ -120,6 +120,60 @@ class HestonModel():
         model.calibrate(helpers, lm, endCriteria)
         self.model = model
 
+    def monte_carlo_paths(self, spot:float, fixingSchedule:ql.Schedule, numPaths:int):
+        """
+        generate paths based on fixing schedule
+        fixingSchedule: fixing schedule
+        numPaths: number of paths
+
+        return: DataFrame with index as fixing dates, columns as paths
+        """
+        # Generate all daily dates between fixingSchedule[0] and fixingSchedule[-1]
+        all_dates = ql.Schedule(fixingSchedule[0], fixingSchedule[-1], ql.Period('1d'), self.calendar, ql.Following, ql.Following, ql.DateGeneration.Backward, False)
+        print(len(all_dates))
+
+        # Set up the Heston process
+        parameters = self.model.params()
+        yield_term_structure = ql.YieldTermStructureHandle(self.yield_curve)
+        dividend_term_structure = ql.YieldTermStructureHandle(self.dividend_curve)
+        initialValue = ql.QuoteHandle(ql.SimpleQuote(spot))
+        process = ql.HestonProcess(yield_term_structure, dividend_term_structure, initialValue, *parameters)
+
+        # Time grid
+        dayCount = ql.Actual365Fixed()
+        time_grid = year_fraction(all_dates, dayCount, accoumulative=True)
+        n_steps = len(all_dates) - 1
+        dimension = process.factors()
+        rng = ql.UniformRandomSequenceGenerator(dimension * n_steps, ql.UniformRandomGenerator())
+        sequenceGenerator = ql.GaussianRandomSequenceGenerator(rng)
+        pathGenerator = ql.GaussianMultiPathGenerator(process, time_grid, sequenceGenerator, False)
+
+        # Simulate paths
+        spot_paths = []
+        for i in range(numPaths):
+            samplePath = pathGenerator.next()
+            values = samplePath.value()
+            # Heston: first factor is the spot process
+            spot_path = [v for v in values[0]]
+            spot_paths.append(spot_path)
+
+        spot_paths = np.array(spot_paths).T  # shape: (len(all_dates), numPaths)
+
+        # Map fixing dates to their index in all_dates
+        all_dates_list = [d for d in all_dates]
+        fixing_dates_set = set(fixingSchedule)
+        fixing_indices = [i for i, d in enumerate(all_dates_list) if d in fixing_dates_set]
+
+        # Select only fixing dates
+        fixing_spot_paths = spot_paths[fixing_indices, :]
+        fixing_dates = [all_dates_list[i] for i in fixing_indices]
+
+        # Convert to DataFrame
+        spot_paths_df = pd.DataFrame(fixing_spot_paths, index=fixing_dates)
+        return spot_paths_df
+
+        
+        
 
 if __name__ == '__main__':
     heston_vol_df = pd.DataFrame({
@@ -132,8 +186,12 @@ if __name__ == '__main__':
     dayCount = ql.Actual365Fixed()
     riskFreeCurve = ql.FlatForward(today, 0.04, dayCount)
     dividendCurve = ql.FlatForward(today, 0.01, dayCount)
-    heston_model = HestonModel(riskFreeCurve, dividendCurve, ql.NullCalendar())
+    heston_model = HestonModel(riskFreeCurve, dividendCurve, ql.TARGET())
     heston_model.calibrate(heston_vol_df, spot)
+    fixingSchedule = ql.Schedule(today, today + ql.Period('1Y'), ql.Period('1M'), ql.TARGET(), ql.Following, ql.Following, ql.DateGeneration.Backward, False)
+    paths = heston_model.monte_carlo_paths(spot, fixingSchedule, 2**2)
+    print([d for d in fixingSchedule])
+    print(paths)
         
 
 
