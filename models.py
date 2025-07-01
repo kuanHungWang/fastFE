@@ -8,7 +8,8 @@ from vol_helper import (
     create_JPY_swaption_helpers,
     create_GBP_swaption_helpers,
     create_CHF_swaption_helpers,
-    create_TWD_swaption_helpers
+    create_TWD_swaption_helpers,
+    create_heston_model_helper
 )
 from util import year_fraction
 
@@ -94,4 +95,48 @@ class HullWhiteModel():
 
 
 
+class HestonModel():
+    def __init__(self, yield_curve, dividend_curve, calendar):
+        self.yield_curve = yield_curve
+        self.dividend_curve = dividend_curve
+        self.calendar = calendar
+        self.model = None
 
+    def calibrate(self, vol:pd.DataFrame, spot:float):
+        initialValue = ql.QuoteHandle(ql.SimpleQuote(spot))
+        theta = 0.010
+        kappa = 0.600
+        sigma = 0.400
+        rho = -0.15
+        v0 = 0.02
+        yield_term_structure = ql.YieldTermStructureHandle(self.yield_curve)
+        dividend_term_structure = ql.YieldTermStructureHandle(self.dividend_curve)
+        hestonProcess = ql.HestonProcess(yield_term_structure, dividend_term_structure, initialValue, v0, kappa, theta, sigma, rho)
+        model = ql.HestonModel(hestonProcess)
+        engine = ql.AnalyticHestonEngine(model)
+        helpers = create_heston_model_helper(vol, spot, self.yield_curve, self.dividend_curve, self.calendar, engine)
+        lm = ql.LevenbergMarquardt(1e-8, 1e-8, 1e-8)
+        endCriteria=ql.EndCriteria(500, 300, 1.0e-8,1.0e-8, 1.0e-8)
+        model.calibrate(helpers, lm, endCriteria)
+        self.model = model
+
+
+if __name__ == '__main__':
+    heston_vol_df = pd.DataFrame({
+        'option_tenor': ['1M', '2M', '3M', '6M', '9M'],
+        'strike': [0.015, 0.018, 0.02, 0.022, 0.025],
+        'vol': [0.015, 0.018, 0.02, 0.022, 0.025]
+    }) 
+    spot = 0.02
+    today = ql.Date().todaysDate()
+    dayCount = ql.Actual365Fixed()
+    riskFreeCurve = ql.FlatForward(today, 0.04, dayCount)
+    dividendCurve = ql.FlatForward(today, 0.01, dayCount)
+    heston_model = HestonModel(riskFreeCurve, dividendCurve, ql.NullCalendar())
+    heston_model.calibrate(heston_vol_df, spot)
+        
+
+
+        
+        
+        

@@ -1,6 +1,32 @@
 import QuantLib as ql
 import pandas as pd
 from conventions import Conventions
+
+def create_heston_model_helper(df: pd.DataFrame, spot:float,yield_curve, dividend_curve, calendar=ql.NullCalendar(),engine=None):
+    """
+    Create a list of QuantLib HestonModelHelper objects from a DataFrame.
+    df: columns:option tenor:str, spot:float, strike:float, vol:float, 
+    
+    """
+    yield_curve_handler = ql.YieldTermStructureHandle(yield_curve)
+    dividend_curve_handler = ql.YieldTermStructureHandle(dividend_curve)
+    helpers = []
+
+    for _, row in df.iterrows():
+        option_tenor = row['option_tenor']
+        strike = float(row['strike'])
+        vol = float(row['vol'])
+        vol =ql.QuoteHandle(ql.SimpleQuote(vol))
+        option_tenor = ql.Period(option_tenor)
+        helper = ql.HestonModelHelper(option_tenor, calendar, spot, strike, vol, yield_curve_handler, dividend_curve_handler)
+        helpers.append(helper)
+        if engine is not None:
+            helper.setPricingEngine(engine)
+    return helpers
+
+    
+
+
 def create_swaption_helper(df, curve, engine=None, fixed_leg_conventions=None, floating_leg_conventions=None):
     if fixed_leg_conventions is None:
         fixed_leg_conventions = Conventions.USFixedLegConventions()
@@ -112,10 +138,16 @@ if __name__ == '__main__':
     swaption_helpers = create_CHF_swaption_helpers(df_swaption, curve, engine)
     swaption_helpers = create_TWD_swaption_helpers(df_swaption, curve, engine)
 
-    optimization_method = ql.LevenbergMarquardt(1.0e-8,1.0e-8,1.0e-8)
-    end_criteria = ql.EndCriteria(10000, 100, 1e-6, 1e-8, 1e-8)
-    model.calibrate(swaption_helpers, optimization_method, end_criteria)
+    heston_vol_df = pd.DataFrame({
+        'option_tenor': ['1M', '2M', '3M', '6M', '9M'],
+        'strike': [0.015, 0.018, 0.02, 0.022, 0.025],
+        'vol': [0.015, 0.018, 0.02, 0.022, 0.025]
+    }) 
+    spot = 0.02
+    dayCount = ql.Actual365Fixed()
+    riskFreeCurve = ql.FlatForward(today, 0.04, dayCount)
+    dividendCurve = ql.FlatForward(today, 0.01, dayCount)
 
-    print(model.params())    
+    heston_helpers = create_heston_model_helper(heston_vol_df, spot, riskFreeCurve, dividendCurve)
 
 
