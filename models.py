@@ -159,17 +159,12 @@ class HestonModel():
 
         spot_paths = np.array(spot_paths).T  # shape: (len(all_dates), numPaths)
 
-        # Map fixing dates to their index in all_dates
+        # Create DataFrame for all simulation dates
         all_dates_list = [d for d in all_dates]
-        fixing_dates_set = set(fixingSchedule)
-        fixing_indices = [i for i, d in enumerate(all_dates_list) if d in fixing_dates_set]
+        spot_paths_df = pd.DataFrame(spot_paths, index=all_dates_list)
 
-        # Select only fixing dates
-        fixing_spot_paths = spot_paths[fixing_indices, :]
-        fixing_dates = [all_dates_list[i] for i in fixing_indices]
-
-        # Convert to DataFrame
-        spot_paths_df = pd.DataFrame(fixing_spot_paths, index=fixing_dates)
+        # Reindex to fixingSchedule (preserves order and handles missing dates)
+        spot_paths_df = spot_paths_df.reindex([d for d in fixingSchedule])
         return spot_paths_df
 
         
