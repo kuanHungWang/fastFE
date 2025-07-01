@@ -74,11 +74,14 @@ fixingSchedule = [calendar.advance(d,ql.Period(-2, ql.Days)) for d in paymentSch
 # generate monte carlo paths
 
 # create ibor index factory as input of monte carlo paths generators.
-def create_ibor_6M(ts):
-    return ql.IborIndex('MyIndex', ql.Period('6m'), 2, currency, calendar, date_rolling_convention, True, dayCount, ts)
+def create_sofr_index(ts):
+    # Use QuantLib's SOFR index as the floating leg
+    return ql.OvernightIndex('SOFR', 1, currency, calendar, dayCount, ts)
+
 
 n_path = 6
-underlying_path, fixings, discountFactors = hw_model.monte_carlo_paths([create_ibor_6M], fixingSchedule, paymentSchedule, n_path)
+underlying_path, fixings, discountFactors = hw_model.monte_carlo_paths([create_sofr_index], fixingSchedule, paymentSchedule, n_path)
+
 # notes: 
 # 1. the resulting underlying_path, fixings, discountFactors are dataframes with index of ql.Date.
 # 2. fixings is a list of dataframes, each dataframe is the fixing of ibor index.
@@ -102,15 +105,28 @@ fixed_cashflows = pd.DataFrame(notional * fixed_rate * year_fraction_rec, index=
 print(f'\nfixed_cashflows: \n{fixed_cashflows}')
 
 
-# floating cashflows
-fixing_date_map = pd.Series(fixingSchedule, index=paymentSchedule)
-fixing_date = fixing_date_map[paySchedule]   # 1. get fixing date from map
-fixing_value = pd.DataFrame(fixings.loc[fixing_date].values, index=paySchedule) # 2. get fixing value from fixings with corresponding fixing date
-fixing_in_advance = True  # 3. process fixing-in-advance case if True
-if fixing_in_advance:
-    fixing_value = fixing_value.shift(1)
-year_fraction_pay = np.array(year_fraction(paySchedule, dayCount, accoumulative=False))[:,np.newaxis] # 4. get year fraction for pay leg
-floating_cashflows = notional * fixing_value * year_fraction_pay # 5. calculate floating cashflows
+# floating cashflows (SOFR daily compounding)
+floating_cashflows = []
+for i in range(1, len(paySchedule)):
+    period_start = paySchedule[i-1]
+    period_end = paySchedule[i]
+    # Get all daily dates in the accrual period
+    daily_dates = [d for d in fixings.index if period_start < d <= period_end]
+    if not daily_dates:
+        print(f"[DEBUG] No daily SOFR dates found for period: {period_start} to {period_end}")
+        print(f"[DEBUG] Available fixings dates: {list(fixings.index)}")
+        raise ValueError(f"No daily SOFR dates available for period {period_start} to {period_end}")
+    # Get daily SOFR rates for all paths
+    daily_rates = fixings.loc[daily_dates].values  # shape: (num_days, num_paths)
+    # Get year fractions for each day (using Actual/360 convention)
+    delta_t = np.array([dayCount.yearFraction(daily_dates[j-1], daily_dates[j]) if j > 0 else dayCount.yearFraction(period_start, daily_dates[j]) for j in range(len(daily_dates))])
+    # For each path, compute compounded rate
+    compounded = np.prod(1 + daily_rates * delta_t[:, np.newaxis], axis=0) - 1
+    # Compute cashflow for each path
+    cf = notional * compounded
+    floating_cashflows.append(cf)
+floating_cashflows = np.vstack(floating_cashflows)
+floating_cashflows = pd.DataFrame(floating_cashflows, index=paySchedule[1:])
 
 
 # ensure same index for case that two leg has different payment schedule
