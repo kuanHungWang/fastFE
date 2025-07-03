@@ -91,7 +91,7 @@ print(f'fixings: \n{fixings}')
 # cashflow according to monte carlo paths.
 fixed_rate = 0.018
 notional = 1_000_000
-
+fixing_in_advance = True
 # convert to list
 paySchedule = [d for d in paySchedule]
 recSchedule = [d for d in recSchedule]
@@ -103,20 +103,31 @@ print(f'\nfixed_cashflows: \n{fixed_cashflows}')
 
 
 # floating cashflows
-fixing_date_map = pd.Series(fixingSchedule, index=paymentSchedule)
-fixing_date = fixing_date_map[paySchedule]   # 1. get fixing date from map
-fixing_value = pd.DataFrame(fixings.loc[fixing_date].values, index=paySchedule) # 2. get fixing value from fixings with corresponding fixing date
-fixing_in_advance = True  # 3. process fixing-in-advance case if True
-if fixing_in_advance:
+
+# Approach 1
+# fixing_date_map = pd.Series(fixingSchedule, index=paymentSchedule)
+# fixing_date = fixing_date_map[paySchedule]   # 1. get fixing date from map
+# fixing_value = pd.DataFrame(fixings.loc[fixing_date].values, index=paySchedule) # 2. get fixing value from fixings with corresponding fixing date
+# fixing_in_advance = True  # 3. process fixing-in-advance case if True
+# if fixing_in_advance:
+#     fixing_value = fixing_value.shift(1)
+# year_fraction_pay = np.array(year_fraction(paySchedule, dayCount, accoumulative=False))[:,np.newaxis] # 4. get year fraction for pay leg
+# floating_cashflows = notional * fixing_value * year_fraction_pay # 5. calculate floating cashflows
+
+
+fixingSchedule = [calendar.advance(d,ql.Period(-2, ql.Days)) for d in paySchedule]  # 1. fixing days only for payschedule
+fixing_value = fixings.loc[fixingSchedule]  # 2. get fxing value with fixing days
+if fixing_in_advance:  # 3. process fixing-in-advance case if True
     fixing_value = fixing_value.shift(1)
 year_fraction_pay = np.array(year_fraction(paySchedule, dayCount, accoumulative=False))[:,np.newaxis] # 4. get year fraction for pay leg
-floating_cashflows = notional * fixing_value * year_fraction_pay # 5. calculate floating cashflows
+floating_cashflows = notional * fixing_value.values * year_fraction_pay  # 5. calculate floating cashflows
+floating_cashflows = pd.DataFrame(floating_cashflows, index=paySchedule)
 
 
 # ensure same index for case that two leg has different payment schedule
 fixed_cashflows = fixed_cashflows.reindex(paymentSchedule) 
+print(f'floating_cashflows: \n{floating_cashflows}')
 floating_cashflows = floating_cashflows.reindex(paymentSchedule)
-print(f'\nfloating_cashflows: \n{floating_cashflows}')
 net_cashflows = fixed_cashflows.values - floating_cashflows  
 print(f'\nnet cashflows: \n{net_cashflows}')
 

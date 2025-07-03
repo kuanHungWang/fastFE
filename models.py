@@ -29,7 +29,7 @@ class HullWhiteModel():
     def calibrate(self, swaption:pd.DataFrame):
         builders ={'USD': create_USD_swaption_helpers, 'EUR': create_EUR_swaption_helpers, 'JPY': create_JPY_swaption_helpers, 'GBP': create_GBP_swaption_helpers, 'CHF': create_CHF_swaption_helpers, 'TWD': create_TWD_swaption_helpers}
         term_structure = ql.YieldTermStructureHandle(self.curve)
-        model = ql.HullWhite(term_structure);
+        model = ql.HullWhite(term_structure)
         engine = ql.JamshidianSwaptionEngine(model)
         helper_builder = builders[self.currency]
         helpers = helper_builder(swaption, self.curve, engine)
@@ -38,6 +38,8 @@ class HullWhiteModel():
         end_criteria = ql.EndCriteria(10000, 100, 1e-6, 1e-8, 1e-8)
         model.calibrate(helpers, optimization_method, end_criteria)
         self.model = model
+        a, sigma = model.params()
+        self.process = ql.HullWhiteProcess(term_structure, a, sigma)
         try:
             self.calibration_detail = calibration_detail(helpers)
         except:
@@ -130,6 +132,8 @@ class HestonModel():
         lm = ql.LevenbergMarquardt(1e-8, 1e-8, 1e-8)
         endCriteria=ql.EndCriteria(500, 300, 1.0e-8,1.0e-8, 1.0e-8)
         model.calibrate(helpers, lm, endCriteria)
+        self.process = ql.HestonProcess(yield_term_structure, dividend_term_structure, initialValue,*model.params())
+
         self.model = model
         try:
             self.calibration_detail = calibration_detail(helpers)

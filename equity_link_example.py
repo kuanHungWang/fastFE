@@ -96,6 +96,7 @@ bermudian_knock_out = 1.1
 strike = 1.0
 european_knock_in = 0.95
 coupon_rate = 0.1
+fixing_in_advance = True
 
 discountFactors = [yieldCurve.discount(d) for d in paymentSchedule]
 discountFactors = pd.DataFrame(discountFactors, index=paymentSchedule)
@@ -103,58 +104,36 @@ print(f'discountFactors: \n{discountFactors}')
 libor_index = ql.IborIndex('MyIndex', ql.Period('6m'), 2, currency, calendar, date_rolling_convention, True, libor_dayCount, ql.YieldTermStructureHandle(yieldCurve))
 libor_fixings = [libor_index.fixing(d) for d in fixingSchedule]
 libor_fixings = pd.DataFrame(libor_fixings, paymentSchedule)
+if fixing_in_advance:
+    libor_fixings = libor_fixings.shift(1)
+libor_year_fraction = np.array(year_fraction(paymentSchedule, libor_dayCount, accoumulative=False))[:, np.newaxis]
+libor_cashflows = notional * libor_fixings * libor_year_fraction
+print(f'libor_cashflows: \n{libor_cashflows}')
+coupon_year_fraction = np.array(year_fraction(paymentSchedule, coupon_dayCount, accoumulative=False))[:, np.newaxis]
+coupon_cashflow = notional * coupon_rate * coupon_year_fraction
+coupon_cashflow = pd.DataFrame(coupon_cashflow, index=paymentSchedule)
+print(f'coupon_cashflow: \n{coupon_cashflow}')
 
-print(f'Libor fixings\nbefore shift: \n{libor_fixings}')
-libor_fixings = libor_fixings.shift(1)  # fixing-in-advance
-print(f'after shift: \n{libor_fixings}')
-
-previous_survival = np.ones((1, equity_fixings.shape[1]), dtype=bool)
+S_T = equity_fixings.iloc[-1]
+knockin = S_T < european_knock_in * spot
+print(f'knockin: \n{knockin}')
+vanilla_option_payoff = notional * np.maximum(strike*spot - S_T, 0)
+print(f'vanilla option payoff regardless of knock-in: \n{vanilla_option_payoff}')
+eki_option_payoff = vanilla_option_payoff * knockin
+print(f'option payoff with condition of knock-in: \n{eki_option_payoff}')
+df_eki_option_payoff = pd.DataFrame(np.zeros_like(equity_fixings, dtype=float), index=paymentSchedule)
+df_eki_option_payoff.iloc[-1] = eki_option_payoff
+print(f'df_eki_option_payoff: \n{df_eki_option_payoff}')
 
 survival = pd.DataFrame(np.zeros_like(equity_fixings, dtype=bool), index=paymentSchedule)
-cashflows = pd.DataFrame(np.zeros_like(equity_fixings, dtype=float), index=paymentSchedule)
-cashflows_with_knock_out = pd.DataFrame(np.zeros_like(equity_fixings, dtype=float), index=paymentSchedule)
+still_alive = np.ones((1, equity_fixings.shape[1]), dtype=bool)
 for d in paymentSchedule:
-    print(f'previous_survival: \n{previous_survival}')
-    coupon_cashflow = notional * coupon_rate * coupon_year_fraction.loc[d]
-    libor_cashflow = notional * libor_fixings.loc[d] * libor_year_fraction.loc[d]
-    net_cf = coupon_cashflow - libor_cashflow
-    cashflows.loc[d] = net_cf.values
-    cf_with_knock_out = previous_survival * net_cf.values
-    print(f'cash_flow_with_knock_out: \n{cf_with_knock_out}')
-    cashflows_with_knock_out.loc[d] = cf_with_knock_out
-    
+    survival.loc[d] = still_alive
+    fixing_day = get_nearest_fixing_date(d, fixingSchedule)
+    still_alive = np.bitwise_and(still_alive, equity_fixings.loc[fixing_day] < bermudian_knock_out * spot)
 
-    # survival.loc[d] = survival
-    nearest_fixing_date = get_nearest_fixing_date(d, fixingSchedule)
-    fixing_d = equity_fixings.loc[nearest_fixing_date]
-    print(f'fixing of {nearest_fixing_date}: \n{fixing_d.values}')
-    current_survival = fixing_d.values < bermudian_knock_out * spot
-    print(f'current_survival: \n{current_survival}')
-
-    if d == paymentSchedule[-1]:
-        knockin = fixing_d.values < european_knock_in * spot
-        vanilla_option_payoff = notional * np.maximum(strike*spot - fixing_d.values, 0)
-        print(f'vanilla option payoff regardless of knock-in: \n{vanilla_option_payoff}')
-        eki_option_payoff = vanilla_option_payoff * knockin
-        print(f'option payoff with condition of knock-in: \n{eki_option_payoff}')
-        final_option_payoff = eki_option_payoff * previous_survival
-        print(f'final option payoff: \n{final_option_payoff}')
-
-
-
-
-
-    previous_survival = np.bitwise_and(previous_survival, current_survival)
-
-    
+print(f'survival: \n{survival}')
+cashflows = coupon_cashflow.values - libor_cashflows.values - df_eki_option_payoff
 print(f'cashflows: \n{cashflows}')
-print(f'cashflows_with_knock_out: \n{cashflows_with_knock_out}')
-all_cashflows = cashflows_with_knock_out.copy()
-all_cashflows.loc[paymentSchedule[-1]] = final_option_payoff
-print(f'all_cashflows: \n{all_cashflows}')
-discounted_cashflows = all_cashflows * discountFactors.values
-print(f'discounted_cashflows: \n{discounted_cashflows}')
-print(f'npv: {discounted_cashflows.mean(axis=1).sum()}')
-
-
-
+cashflow_survival = cashflows * survival
+print(f'cashflow_survival: \n{cashflow_survival}')
