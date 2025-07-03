@@ -47,7 +47,9 @@ def bootstrap_curve_with_instrument_helpers(settlementDate, helpers, dayCount, m
         'splineCubicDiscount': ql.PiecewiseSplineCubicDiscount
         }
     builder = builders.get(method, ql.PiecewiseCubicZero)
-    return builder(settlementDate, helpers, dayCount)
+    curve = builder(settlementDate, helpers, dayCount)
+    curve.enableExtrapolation()
+    return curve
 
 def bootstrap_curve(settlementDate, dayCount, deposit: Tuple=None, swap: Tuple=None, OIS: Tuple=None, FRA: Tuple=None):
 
