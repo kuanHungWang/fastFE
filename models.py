@@ -280,7 +280,36 @@ class HestonModel():
         spot_paths_df = spot_paths_df.reindex([d for d in fixingSchedule])
         return spot_paths_df
 
+class MultiAssetModel():
+    def __init__(self, processes, correlation_matrix):
+        self.processes = processes
+        self.correlation_matrix = correlation_matrix
         
+    def monte_carlo_paths(self, fixingSchedule:ql.Schedule, numPaths:int, dayCount:ql.DayCounter=ql.Actual365Fixed()):
+        process = ql.StochasticProcessArray(self.processes, self.correlation_matrix)
+        # Time grid
+        time_grid = year_fraction(fixingSchedule, dayCount, accoumulative=True)
+        n_steps = len(time_grid) - 1
+        dimension = process.factors()
+        rng = ql.UniformRandomSequenceGenerator(dimension * n_steps, ql.UniformRandomGenerator())
+        sequenceGenerator = ql.GaussianRandomSequenceGenerator(rng)
+        pathGenerator = ql.GaussianMultiPathGenerator(process, time_grid, sequenceGenerator, False)
+
+        # Simulate paths
+        spot_paths = [[] for _ in range(len(self.processes))]
+        for i in range(numPaths):
+            samplePath = pathGenerator.next()
+            values = samplePath.value()
+            for i, value in enumerate(values):
+                spot_paths[i].append([v for v in value])
+        
+        transposed_paths = [np.array(path).T for path in spot_paths]
+            
+
+        # Create DataFrame for all simulation dates
+        spot_paths_df = [pd.DataFrame(transposed_path, index=[d for d in fixingSchedule]) for transposed_path in transposed_paths]
+
+        return spot_paths_df
         
 
 if __name__ == '__main__':
@@ -307,18 +336,28 @@ if __name__ == '__main__':
     spot=100
     black_model = BlackScholesMertonModel(riskFreeCurve, dividendCurve, vol_curve, spot)
     paths = black_model.monte_carlo_paths(fixingSchedule, 2**2)
-    print(paths)
+    print(f'\npath of black_model: \n{paths}')
 
     fxModel=GarmanKohlagenProcessModel(riskFreeCurve, dividendCurve, vol_curve, spot)
     paths = fxModel.monte_carlo_paths(fixingSchedule, 2**2)
-    print(paths)
+    print(f'\npath of fxModel: \n{paths}')
 
     df_vol_surface = get_volatility_surface('AAPL', ['1M', '2M', '3M', '6M', '9M'], [100, 110, 120, 130, 140])
 
+    spot = 70
     vol_surface = create_black_vol_surface(df_vol_surface, ql.Date().todaysDate())
     equity_model = BlackScholesMertonModel(riskFreeCurve, dividendCurve, vol_surface, spot)
     paths = equity_model.monte_carlo_paths(fixingSchedule, 2**2)
-    print(paths)
+    print(f'\npath of equity_model: \n{paths}')
+
+    corrMatrix = [[1, 0.5], [0.5, 1]]
+    processes = [black_model.process, equity_model.process]
+    multiAssetModel = MultiAssetModel(processes, corrMatrix)
+    paths = multiAssetModel.monte_carlo_paths(fixingSchedule, 2**2)
+    print(f'\npath of multiAssetModel:')
+    for path in paths:
+        print(path)
+    
     
 
     
