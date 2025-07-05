@@ -127,6 +127,32 @@ def get_sofr_future(years:List[int], months:List[int], freq:list) -> pd.DataFram
         'freq': freq,
         'price': prices
     })
+
+
+def get_volatility_surface(ticker: str, tenor: List[str], strikes: List[float]) -> pd.DataFrame:
+    """
+    create a mock vol surface for given ticker, tenor and strikes.
+    return: pd.DataFrame, index: strike, columns: tenor
+    generated value must be positive value between 0.3 and 0.7, smooth and increasing with tenor.
+    """
+    n_strikes = len(strikes)
+    n_tenors = len(tenor)
+    # Generate a base curve that increases smoothly with tenor
+    base_curve = np.linspace(0.3, 0.7, n_tenors)
+    # Add a smooth variation by strike, so each row is similar but slightly different
+    surface = np.zeros((n_strikes, n_tenors))
+    for i, strike in enumerate(strikes):
+        # Add a small offset for each strike so surfaces aren't flat
+        offset = 0.01 * (i - n_strikes // 2)
+        # Optionally, add a small random noise for realism, but keep values in [0.3, 0.7]
+        noise = np.random.normal(0, 0.005, n_tenors)
+        row = base_curve + offset + noise
+        row = np.clip(row, 0.3, 0.7)
+        surface[i, :] = row
+    df = pd.DataFrame(surface, index=strikes, columns=tenor)
+    return df
+
+    
     
 if __name__ == '__main__':
     deposit = get_deposit(['1M', '2M', '3M', '6M', '9M'])
@@ -139,7 +165,8 @@ if __name__ == '__main__':
     print(swaption)
     print(fra)
     print(sofr_future)
+    print(get_volatility_surface('USD', ['1Y', '2Y', '5Y', '7Y', '10Y', '15Y', '20Y', '25Y', '30Y'], [0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1]))
 
-        
+    
     
     

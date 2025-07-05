@@ -14,7 +14,7 @@ from vol_helper import (
     create_black_vol_surface
 )
 from util import year_fraction
-
+from market_data import get_volatility_surface
 
 
 
@@ -313,6 +313,16 @@ if __name__ == '__main__':
     paths = fxModel.monte_carlo_paths(fixingSchedule, 2**2)
     print(paths)
 
+    df_vol_surface = get_volatility_surface('AAPL', ['1M', '2M', '3M', '6M', '9M'], [100, 110, 120, 130, 140])
+
+    vol_surface = create_black_vol_surface(df_vol_surface, ql.Date().todaysDate())
+    equity_model = BlackScholesMertonModel(riskFreeCurve, dividendCurve, vol_surface, spot)
+    paths = equity_model.monte_carlo_paths(fixingSchedule, 2**2)
+    print(paths)
+    
+
+    
+    
 
         
         
