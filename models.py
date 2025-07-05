@@ -9,9 +9,14 @@ from vol_helper import (
     create_GBP_swaption_helpers,
     create_CHF_swaption_helpers,
     create_TWD_swaption_helpers,
-    create_heston_model_helper
+    create_heston_model_helper,
+    create_black_vol_curve,
+    create_black_vol_surface
 )
 from util import year_fraction
+
+
+
 
 def calibration_detail(helpers):
     modelValues = [helper.modelValue() for helper in helpers]
@@ -19,6 +24,91 @@ def calibration_detail(helpers):
     calibrationErrors = [helper.calibrationError() for helper in helpers]
     return pd.DataFrame({'modelValue': modelValues, 'marketValue': marketValues, 'calibrationError': calibrationErrors})
 
+class GarmanKohlagenProcessModel():
+    def __init__(self, foreignRiskCurve, domesticRiskFreeCurve, vol_curve, initialValue):
+        self.foreignRiskCurve = foreignRiskCurve
+        self.domesticRiskFreeCurve = domesticRiskFreeCurve
+        self.vol_curve=vol_curve
+        self.initialValue = initialValue
+        foreignRisk_ts = ql.YieldTermStructureHandle(foreignRiskCurve)
+        domesticRiskFree_ts = ql.YieldTermStructureHandle(domesticRiskFreeCurve)
+        vol_ts = ql.BlackVolTermStructureHandle(vol_curve)
+        initialValue = ql.QuoteHandle(ql.SimpleQuote(self.initialValue))
+        
+        process = ql.GarmanKohlagenProcess(initialValue, foreignRisk_ts, domesticRiskFree_ts, vol_ts)
+        self.process = process
+
+
+    def monte_carlo_paths(self, fixingSchedule:ql.Schedule, numPaths:int):
+        process = self.process
+        # Time grid
+        dayCount = ql.Actual365Fixed()
+        time_grid = year_fraction(fixingSchedule, dayCount, accoumulative=True)
+        n_steps = len(time_grid) - 1
+        dimension = process.factors()
+        rng = ql.UniformRandomSequenceGenerator(dimension * n_steps, ql.UniformRandomGenerator())
+        sequenceGenerator = ql.GaussianRandomSequenceGenerator(rng)
+        pathGenerator = ql.GaussianMultiPathGenerator(process, time_grid, sequenceGenerator, False)
+
+        # Simulate paths
+        spot_paths = []
+        for i in range(numPaths):
+            samplePath = pathGenerator.next()
+            values = samplePath.value()
+            # Heston: first factor is the spot process
+            spot_path = [v for v in values[0]]
+            spot_paths.append(spot_path)
+
+        spot_paths = np.array(spot_paths).T  # shape: (len(all_dates), numPaths)
+
+        # Create DataFrame for all simulation dates
+        spot_paths_df = pd.DataFrame(spot_paths, index=[d for d in fixingSchedule])
+
+        return spot_paths_df
+
+
+class BlackScholesMertonModel():
+    def __init__(self, yield_curve, dividend_curve, vol_curve, initialValue):
+        self.yield_curve = yield_curve
+        self.dividend_curve = dividend_curve
+        self.vol_curve=vol_curve
+        self.initialValue = initialValue
+        yield_ts = ql.YieldTermStructureHandle(yield_curve)
+        dividend_ts = ql.YieldTermStructureHandle(dividend_curve)
+        vol_ts = ql.BlackVolTermStructureHandle(vol_curve)
+        initialValue = ql.QuoteHandle(ql.SimpleQuote(self.initialValue))
+        
+        process = ql.BlackScholesMertonProcess(initialValue, dividend_ts, yield_ts, vol_ts)
+        self.process = process
+
+
+    def monte_carlo_paths(self, fixingSchedule:ql.Schedule, numPaths:int):
+        process = self.process
+        # Time grid
+        dayCount = ql.Actual365Fixed()
+        time_grid = year_fraction(fixingSchedule, dayCount, accoumulative=True)
+        n_steps = len(time_grid) - 1
+        dimension = process.factors()
+        rng = ql.UniformRandomSequenceGenerator(dimension * n_steps, ql.UniformRandomGenerator())
+        sequenceGenerator = ql.GaussianRandomSequenceGenerator(rng)
+        pathGenerator = ql.GaussianMultiPathGenerator(process, time_grid, sequenceGenerator, False)
+
+        # Simulate paths
+        spot_paths = []
+        for i in range(numPaths):
+            samplePath = pathGenerator.next()
+            values = samplePath.value()
+            # Heston: first factor is the spot process
+            spot_path = [v for v in values[0]]
+            spot_paths.append(spot_path)
+
+        spot_paths = np.array(spot_paths).T  # shape: (len(all_dates), numPaths)
+
+        # Create DataFrame for all simulation dates
+        spot_paths_df = pd.DataFrame(spot_paths, index=[d for d in fixingSchedule])
+
+        return spot_paths_df
+        
 class HullWhiteModel():
     def __init__(self, settlementDate, curve, currency):
         self.curve = curve
@@ -61,8 +151,9 @@ class HullWhiteModel():
         dayCount=ql.Actual365Fixed()
 
         dimension = process.factors()
-        n_steps = len(all_dates)-1
+        
         time_grid = year_fraction(all_dates, dayCount, accoumulative=True)
+        n_steps = len(time_grid)-1
         rng = ql.UniformRandomSequenceGenerator(dimension * n_steps, ql.UniformRandomGenerator())
         sequenceGenerator = ql.GaussianRandomSequenceGenerator(rng)
         pathGenerator = ql.GaussianMultiPathGenerator(process, time_grid, sequenceGenerator, False)
@@ -110,7 +201,7 @@ class HullWhiteModel():
 
 
 class HestonModel():
-    def __init__(self, yield_curve, dividend_curve, calendar):
+    def __init__(self, yield_curve, dividend_curve, calendar=ql.WeekendsOnly()):
         self.yield_curve = yield_curve
         self.dividend_curve = dividend_curve
         self.calendar = calendar
@@ -140,7 +231,7 @@ class HestonModel():
         except:
             self.calibration_detail = None
 
-    def monte_carlo_paths(self, spot:float, fixingSchedule:ql.Schedule, numPaths:int):
+    def monte_carlo_paths(self, fixingSchedule:ql.Schedule, numPaths:int):
         """
         generate paths based on fixing schedule
         fixingSchedule: fixing schedule
@@ -153,16 +244,18 @@ class HestonModel():
         print(len(all_dates))
 
         # Set up the Heston process
-        parameters = self.model.params()
-        yield_term_structure = ql.YieldTermStructureHandle(self.yield_curve)
-        dividend_term_structure = ql.YieldTermStructureHandle(self.dividend_curve)
-        initialValue = ql.QuoteHandle(ql.SimpleQuote(spot))
-        process = ql.HestonProcess(yield_term_structure, dividend_term_structure, initialValue, *parameters)
-
+        # parameters = self.model.params()
+        # yield_term_structure = ql.YieldTermStructureHandle(self.yield_curve)
+        # dividend_term_structure = ql.YieldTermStructureHandle(self.dividend_curve)
+        # initialValue = ql.QuoteHandle(ql.SimpleQuote(spot))
+        # process = ql.HestonProcess(yield_term_structure, dividend_term_structure, initialValue, *parameters)
+        process = self.process
         # Time grid
         dayCount = ql.Actual365Fixed()
         time_grid = year_fraction(all_dates, dayCount, accoumulative=True)
-        n_steps = len(all_dates) - 1
+        print(len(time_grid))
+        print(len(all_dates))
+        n_steps = len(time_grid) - 1
         dimension = process.factors()
         rng = ql.UniformRandomSequenceGenerator(dimension * n_steps, ql.UniformRandomGenerator())
         sequenceGenerator = ql.GaussianRandomSequenceGenerator(rng)
@@ -196,19 +289,29 @@ if __name__ == '__main__':
         'strike': [0.015, 0.018, 0.02, 0.022, 0.025],
         'vol': [0.015, 0.018, 0.02, 0.022, 0.025]
     }) 
+    black_vol_df = pd.Series([0.015, 0.018, 0.02, 0.022, 0.025], index=['1M', '2M', '3M', '6M', '9M']) 
+    vol_curve = create_black_vol_curve(black_vol_df, ql.Date().todaysDate())
     spot = 0.02
     today = ql.Date().todaysDate()
     dayCount = ql.Actual365Fixed()
     riskFreeCurve = ql.FlatForward(today, 0.04, dayCount)
     dividendCurve = ql.FlatForward(today, 0.01, dayCount)
+    black_model = BlackScholesMertonModel(riskFreeCurve, dividendCurve, vol_curve, spot)
     heston_model = HestonModel(riskFreeCurve, dividendCurve, ql.TARGET())
     heston_model.calibrate(heston_vol_df, spot)
     fixingSchedule = ql.Schedule(today, today + ql.Period('1Y'), ql.Period('1M'), ql.TARGET(), ql.Following, ql.Following, ql.DateGeneration.Backward, False)
-    paths = heston_model.monte_carlo_paths(spot, fixingSchedule, 2**2)
+    paths = heston_model.monte_carlo_paths(fixingSchedule, 2**2)
     print([d for d in fixingSchedule])
     print(paths)
     print(heston_model.calibration_detail)
-        
+    spot=100
+    black_model = BlackScholesMertonModel(riskFreeCurve, dividendCurve, vol_curve, spot)
+    paths = black_model.monte_carlo_paths(fixingSchedule, 2**2)
+    print(paths)
+
+    fxModel=GarmanKohlagenProcessModel(riskFreeCurve, dividendCurve, vol_curve, spot)
+    paths = fxModel.monte_carlo_paths(fixingSchedule, 2**2)
+    print(paths)
 
 
         

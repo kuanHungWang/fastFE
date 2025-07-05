@@ -2,6 +2,30 @@ import QuantLib as ql
 import pandas as pd
 from conventions import Conventions
 
+
+def create_black_vol_curve(vol_curve: pd.Series, reference_date:ql.Date, dayCount:ql.DayCounter=ql.Business252()):
+
+
+    expirations = [reference_date+ql.Period(tenor) for tenor in vol_curve.index]
+    volatilities = vol_curve.values
+
+
+    volatilityCurve = ql.BlackVarianceCurve(reference_date, expirations, volatilities, dayCount)
+    volatilityCurve.enableExtrapolation()
+    return volatilityCurve
+
+def create_black_vol_surface(df: pd.DataFrame, reference_date:ql.Date, dayCount:ql.DayCounter=ql.Business252(), calendar=ql.WeekendsOnly()):
+    
+    expirations = [reference_date+ql.Period(tenor) for tenor in df.columns]
+    strikes = list(df.index)
+    volMatrix = ql.Matrix(len(strikes), len(expirations))
+    for i, strike in enumerate(strikes):
+        for j, expiration in enumerate(expirations):
+            volMatrix[i][j] = df.iloc[i,j]
+    volatilitySurface = ql.BlackVarianceSurface(reference_date, calendar, expirations, strikes, volMatrix, dayCount)
+    volatilitySurface.enableExtrapolation()
+    return volatilitySurface
+
 def create_heston_model_helper(df: pd.DataFrame, spot:float,yield_curve, dividend_curve, calendar=ql.NullCalendar(),engine=None):
     """
     Create a list of QuantLib HestonModelHelper objects from a DataFrame.
@@ -23,8 +47,6 @@ def create_heston_model_helper(df: pd.DataFrame, spot:float,yield_curve, dividen
         if engine is not None:
             helper.setPricingEngine(engine)
     return helpers
-
-    
 
 
 def create_swaption_helper(df, curve, engine=None, fixed_leg_conventions=None, floating_leg_conventions=None):
@@ -149,5 +171,3 @@ if __name__ == '__main__':
     dividendCurve = ql.FlatForward(today, 0.01, dayCount)
 
     heston_helpers = create_heston_model_helper(heston_vol_df, spot, riskFreeCurve, dividendCurve)
-
-

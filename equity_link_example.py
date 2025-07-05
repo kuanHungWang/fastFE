@@ -83,7 +83,7 @@ fixingSchedule = [d for d in fixingSchedule]
 
 coupon_year_fraction = pd.DataFrame(year_fraction(paymentSchedule, coupon_dayCount, accoumulative=False), index=paymentSchedule)
 libor_year_fraction = pd.DataFrame(year_fraction(paymentSchedule, libor_dayCount, accoumulative=False), index=paymentSchedule)
-equity_fixings = heston_model.monte_carlo_paths(spot, fixingSchedule, 2**2)
+equity_fixings = heston_model.monte_carlo_paths(fixingSchedule, 2**2)
 
 print(f'equity_fixings: \n{equity_fixings}')
 
