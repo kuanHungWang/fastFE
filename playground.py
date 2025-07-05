@@ -51,3 +51,31 @@ pathGenerator = ql.GaussianMultiPathGenerator(process, time_grid, sequenceGenera
 
 
 samplePath = pathGenerator.next()
+
+today = ql.Date().todaysDate()
+calendar = ql.NullCalendar()
+dayCounter = ql.Actual365Fixed()
+spot = 100
+r, q = 0.02, 0.05
+
+spotQuote = ql.QuoteHandle(ql.SimpleQuote(spot))
+ratesTs = ql.YieldTermStructureHandle(ql.FlatForward(today, r, dayCounter))
+dividendTs = ql.YieldTermStructureHandle(ql.FlatForward(today, q, dayCounter))
+
+# Market options price quotes
+optionStrikes = [95, 97.5, 100, 102.5, 105, 90, 95, 100, 105, 110, 80, 90, 100, 110, 120]
+optionMaturities = ["3M", "3M", "3M", "3M", "3M", "6M", "6M", "6M", "6M", "6M", "1Y", "1Y", "1Y", "1Y", "1Y"]
+optionQuotedVols = [0.11, 0.105, 0.1, 0.095, 0.095, 0.12, 0.11, 0.105, 0.1, 0.105, 0.12, 0.115, 0.11, 0.11, 0.115]
+
+calibrationSet = ql.CalibrationSet()
+
+for strike, expiry, impliedVol in zip(optionStrikes, optionMaturities, optionQuotedVols):
+  payoff = ql.PlainVanillaPayoff(ql.Option.Call, strike)
+  exercise = ql.EuropeanExercise(calendar.advance(today, ql.Period(expiry)))
+
+  calibrationSet.push_back((ql.VanillaOption(payoff, exercise), ql.SimpleQuote(impliedVol)))
+
+ahInterpolation = ql.AndreasenHugeVolatilityInterpl(calibrationSet, spotQuote, ratesTs, dividendTs)
+ahLocalSurface = ql.AndreasenHugeLocalVolAdapter(ahInterpolation)
+ts = ql.BlackVolTermStructureHandle(ahLocalSurface)
+print(f'ahLocalSurface: \n{ahLocalSurface}')

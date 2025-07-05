@@ -131,25 +131,33 @@ def get_sofr_future(years:List[int], months:List[int], freq:list) -> pd.DataFram
 
 def get_volatility_surface(ticker: str, tenor: List[str], strikes: List[float]) -> pd.DataFrame:
     """
-    create a mock vol surface for given ticker, tenor and strikes.
-    return: pd.DataFrame, index: strike, columns: tenor
-    generated value must be positive value between 0.3 and 0.7, smooth and increasing with tenor.
+    Create a mock vol surface for given ticker, tenor and strikes.
+    Return: pd.DataFrame, index: strike, columns: tenor
+    Generated value must be positive value between 0.3 and 0.7, smooth and increasing with tenor.
     """
     n_strikes = len(strikes)
     n_tenors = len(tenor)
-    # Generate a base curve that increases smoothly with tenor
+    # Generate a base curve that increases smoothly and strictly with tenor
     base_curve = np.linspace(0.3, 0.7, n_tenors)
-    # Add a smooth variation by strike, so each row is similar but slightly different
     surface = np.zeros((n_strikes, n_tenors))
+    # Use a smooth function for strike variation (e.g., a quadratic centered at the ATM)
+    center = np.mean(strikes)
+    max_offset = 0.04  # maximum deviation from base curve by strike
     for i, strike in enumerate(strikes):
-        # Add a small offset for each strike so surfaces aren't flat
-        offset = 0.01 * (i - n_strikes // 2)
-        # Optionally, add a small random noise for realism, but keep values in [0.3, 0.7]
-        noise = np.random.normal(0, 0.005, n_tenors)
-        row = base_curve + offset + noise
+        # Quadratic offset, smooth and symmetric around center strike
+        offset = max_offset * -((strike - center) / (max(strikes) - min(strikes) + 1e-8))**2 + max_offset
+        # No random noise, just a small deterministic ripple for realism
+        ripple = 0.005 * np.sin(2 * np.pi * i / max(n_strikes-1,1))
+        row = base_curve + offset + ripple
+        # Ensure strict monotonicity with tenor (cumulative max)
+        row = np.maximum.accumulate(row)
+        # Clip to [0.3, 0.7]
         row = np.clip(row, 0.3, 0.7)
         surface[i, :] = row
+    # Optionally, smooth along strike axis (rolling mean)
+    import pandas as pd
     df = pd.DataFrame(surface, index=strikes, columns=tenor)
+    df = df.rolling(window=3, min_periods=1, axis=0, center=True).mean()
     return df
 
     

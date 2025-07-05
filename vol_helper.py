@@ -14,7 +14,7 @@ def create_black_vol_curve(vol_curve: pd.Series, reference_date:ql.Date, dayCoun
     volatilityCurve.enableExtrapolation()
     return volatilityCurve
 
-def create_black_vol_surface(df: pd.DataFrame, reference_date:ql.Date, dayCount:ql.DayCounter=ql.Business252(), calendar=ql.WeekendsOnly()):
+def create_black_vol_surface(df: pd.DataFrame, reference_date:ql.Date, dayCount:ql.DayCounter=ql.Actual365Fixed(), calendar=ql.WeekendsOnly()):
     
     expirations = [reference_date+ql.Period(tenor) for tenor in df.columns]
     strikes = list(df.index)

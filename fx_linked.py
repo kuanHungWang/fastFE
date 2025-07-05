@@ -1,0 +1,139 @@
+import QuantLib as ql
+import numpy as np
+import pandas as pd
+from util import leg_to_series, subset_to_bool
+from datetime import datetime
+from rate_helpers import (
+    create_USD_deposit_rate_helpers,
+    create_USD_swap_rate_helpers,
+    create_deposit_rate_helpers,
+    create_swap_rate_helpers,
+    create_OIS_helper,
+    create_fra_rate_helpers,  # <-- corrected
+    create_bond_helper,
+    create_sofr_future_rate_helpers
+)
+from curve_builder import bootstrap_USD_curve, bootstrap_EUR_curve, bootstrap_JPY_curve, bootstrap_GBP_curve, bootstrap_TWD_curve
+from conventions import Conventions
+from typing import Literal, Tuple
+from curve_builder import bootstrap_curve_with_instrument_helpers, bootstrap_curve
+from vol_helper import (
+    create_USD_swaption_helpers, create_EUR_swaption_helpers,
+    create_JPY_swaption_helpers, create_GBP_swaption_helpers,
+    create_CHF_swaption_helpers, create_TWD_swaption_helpers,
+    create_black_vol_curve, create_black_vol_surface
+)
+
+from curve_builder import bootstrap_USD_curve
+from util import get_nearest_fixing_date, year_fraction, combine_schedule
+from leastSquareError import LongstaffSchwartz
+from models import HullWhiteModel, HestonModel, BlackScholesMertonModel, GarmanKohlagenProcessModel
+
+from market_data import (
+    get_deposit, get_swap, get_swaption, 
+    get_FRA, get_sofr_future, get_volatility_surface)
+
+
+
+US_calendar = ql.UnitedStates(ql.UnitedStates.NYSE)
+EUR_calendar = ql.TARGET()
+calendar = ql.JointCalendar(US_calendar, EUR_calendar)
+today = ql.Date().todaysDate()
+today = calendar.advance(today,ql.Period(0, ql.Days))  # ensure today is a business day (In case of using in non-trading day)
+settlementDate = calendar.advance(today,ql.Period(2, ql.Days))
+ql.Settings.instance().evaluationDate = today
+print(f' trade date: {today}')
+print(f' settlement date: {settlementDate}')
+
+
+
+
+
+
+eur_deposit = get_deposit(['1M', '2M', '3M', '6M', '9M'])
+eur_swap = get_swap(['1Y', '2Y', '5Y', '7Y', '10Y', '15Y', '20Y', '25Y', '30Y'])
+eur_yieldCurve = bootstrap_EUR_curve(today, deposit=eur_deposit, swap=eur_swap)
+
+usd_deposit = get_deposit(['1M', '2M', '3M', '6M', '9M'])
+usd_swap = get_swap(['1Y', '2Y', '5Y', '7Y', '10Y', '15Y', '20Y', '25Y', '30Y'])
+usd_yieldCurve = bootstrap_USD_curve(today, deposit=usd_deposit, swap=usd_swap)
+
+eurusd_vol = get_volatility_surface('EUR', ['1M', '2M', '3M', '6M', '9M', '12M'], [1.05, 1.07, 1.09, 1.11, 1.13, 1.15])
+vol_surface = create_black_vol_surface(eurusd_vol, today)
+spot = 1.1
+fx_model = GarmanKohlagenProcessModel(usd_yieldCurve, eur_yieldCurve, vol_surface, spot)
+
+frequency=ql.Period('3M')
+terminationDate = calendar.advance(settlementDate, ql.Period('1Y'))
+
+date_rolling_convention = ql.ModifiedFollowing
+date_termination_convention = ql.ModifiedFollowing
+rule = ql.DateGeneration.Backward
+if calendar.isEndOfMonth(terminationDate):
+    endOfMonth = True
+else:
+    endOfMonth = False
+
+paymentSchedule = ql.Schedule(settlementDate, terminationDate, frequency, calendar, date_rolling_convention, date_termination_convention, rule, endOfMonth)
+
+paymentSchedule = [d for d in paymentSchedule]
+
+# pay 3M Euribor coupon, act360, fixing in advance
+
+# receive daily range accrual coupon, 30/360
+# range: 0.99< EURUSD < 1.2
+# for each payment period, use the fixing value 5 days prior to the payment date for remaining fixing period
+# coupon rate: 2%
+
+notional = 1_000_000
+coupon_rate = 0.02
+upper_bound = 1.2
+lower_bound = 0.99
+fixing_in_advance = True
+n_period_end_replacement = 5
+ts = ql.YieldTermStructureHandle(eur_yieldCurve)
+libor_dayCount = ql.Actual360()
+libor_index = ql.Euribor3M(ts)
+libor_fixings = pd.DataFrame([libor_index.fixing(d) for d in paymentSchedule], index=paymentSchedule)
+print(f'libor_fixings: \n{libor_fixings}')
+if fixing_in_advance:
+    libor_fixings = libor_fixings.shift(1)
+    
+
+libor_year_fraction = pd.DataFrame(year_fraction(paymentSchedule, libor_dayCount, accoumulative=False), index=paymentSchedule)
+
+libor_cashflows = notional * libor_fixings * libor_year_fraction
+print(f'libor_cashflows: \n{libor_cashflows}')
+
+daily_fixing_days = ql.MakeSchedule(settlementDate, terminationDate, ql.Period('1d'), calendar=calendar)
+print(len(daily_fixing_days))
+
+n_paths = 2**2
+fx_fixing = fx_model.monte_carlo_paths(daily_fixing_days, numPaths=n_paths)
+
+
+range_accrual_yearFraction = year_fraction(paymentSchedule, ql.Actual360(), accoumulative=False)
+range_accrual_yearFraction = pd.DataFrame(range_accrual_yearFraction, index=paymentSchedule)
+start_date = paymentSchedule[0]
+
+
+
+range_accrual_cashflows = pd.DataFrame(np.zeros((len(paymentSchedule), n_paths), dtype=float), index=paymentSchedule)
+for d in paymentSchedule[1:]:
+    end_dade = d
+    # For each payment period, calculate range accrual coupon
+    period_fixing = fx_fixing.loc[start_date:end_dade]
+    # Handle the last 5 days: use fixing 5 days prior to payment date
+    if len(period_fixing) > n_period_end_replacement:
+
+        period_fixing.iloc[-n_period_end_replacement:] = period_fixing.iloc[-n_period_end_replacement]  # use fixing 5 days prior for last 5 days
+
+    # Count in-range days
+
+    in_range = (period_fixing > lower_bound) & (period_fixing < upper_bound)
+    accrual_fraction = in_range.mean(axis=0).values
+    accrual_amount = notional * coupon_rate * accrual_fraction * range_accrual_yearFraction.loc[end_dade].values
+    range_accrual_cashflows.loc[end_dade] = accrual_amount
+    print(f'Period {start_date} to {end_dade}: In-range days=\n{in_range.sum(axis=0)}, Total days=\n{len(period_fixing)}, Accrual fraction=\n{accrual_fraction}')
+    start_date = d
+print(range_accrual_cashflows)
