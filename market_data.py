@@ -157,7 +157,7 @@ def get_volatility_surface(ticker: str, tenor: List[str], strikes: List[float]) 
     # Optionally, smooth along strike axis (rolling mean)
     import pandas as pd
     df = pd.DataFrame(surface, index=strikes, columns=tenor)
-    df = df.rolling(window=3, min_periods=1, axis=0, center=True).mean()
+    df = df.rolling(window=3, min_periods=1, center=True).mean()
     return df
 
     

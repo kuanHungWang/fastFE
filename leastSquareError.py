@@ -3,7 +3,7 @@ import numpy as np
 from typing import List, Callable
 from sklearn import linear_model
 from util import get_nearest_fixing_date, year_fraction
-
+import QuantLib as ql
 class LongstaffSchwartz():
     def __init__(self, cashflows: pd.DataFrame, 
                  discountFactors: pd.DataFrame, 
@@ -24,7 +24,7 @@ class LongstaffSchwartz():
         self.regressors = []
         self._exercise_cashflows = pd.DataFrame(np.zeros(self.cashflows.shape), index=self.cashflows.index, columns=self.cashflows.columns)
         valuation = np.zeros(self.cashflows.shape[1])  # shape_single_step
-        print(f'valuation.shape: {valuation.shape}')
+        print(f'valuation.shape: {valuation.shape}, type: {type(valuation)}')
         survival = pd.DataFrame(
             np.ones(self.cashflows.shape,dtype=bool),  # or proper shape
             index=self.cashflows.index,
@@ -37,8 +37,8 @@ class LongstaffSchwartz():
             current_cf = self.cashflows.loc[d]
             if self.exercise_schedule.loc[d]:
                 print('\n  Process exercise')
-                print('Valuation of future cf:')
-                print(np.round(valuation.values, 2))
+                print(f'Valuation of future cf:')
+                print(np.round(valuation, 2))
                 reg = linear_model.LinearRegression()
                 nearest_fixing_date = get_nearest_fixing_date(d, self.observable.index)
                 print(f'using fixing date: {nearest_fixing_date} for early exercise call date: {d}')
@@ -55,12 +55,12 @@ class LongstaffSchwartz():
 
                 optimized = not_exercise * valuation + exercise * exe_payoff
                 print('optimized value:')
-                print(np.round(optimized.values, 2))
+                print(np.round(optimized, 2))
                 valuation = current_cf + optimized
                 print('cashflow of current step:')
-                print(np.round(current_cf.values, 2))
+                print(np.round(current_cf, 2))
                 print('optimized value plus current cf:')
-                print(np.round(valuation.values, 2))
+                print(np.round(valuation, 2))
                 survival.loc[d,:] = not_exercise
                 self.regressors.insert(0, reg)
             else:
@@ -69,12 +69,12 @@ class LongstaffSchwartz():
                 print(np.round(valuation, 2))
                 valuation = current_cf + valuation
                 print('cashflow of current step:')
-                print(np.round(current_cf.values, 2))
+                print(np.round(current_cf, 2))
                 print('Futre npv plus current cf:')
-                print(np.round(valuation.values, 2))
-            valuation = self.discountFactors.loc[d] * valuation
+                print(np.round(valuation, 2))
+            valuation = self.discountFactors.loc[d].values * valuation
             print('discount:')
-            print(np.round(valuation.values, 2))
+            print(np.round(valuation, 2))
         self.valuation = valuation
         print(f'valuation of monte carlo simulation: {valuation.mean():,.2f}')
         self.survival = survival
@@ -112,6 +112,41 @@ class LongstaffSchwartz():
         print(f'exercise cashflows: \n{cf}')
         return cf.mean(axis=1)
 
+if __name__ == '__main__':
 
 
-        
+    # Example of using LongstaffSchwartz
+    # LongstaffSchwartz(cashflows, discountFactor, exercise_schedule, payoff, fixing)
+    # cashflows: pd.DataFrame, the net cashflows of a financial contract before applying discounting and early exercise (index: time, columns: path)
+    # discountFactors: pd.DataFrame, discount factor for one time period (from t to t-1), not discount to t0, for interest rate model, it has multiple column like cashflow, otherwise, if using deterministic discounting, it has only one column.
+    # exercise_schedule: pd.Series|List, the early exercise scheulde, single column value, for panda series, index must the same as cashflows, and dtype is bool, representing exercisable or not.
+    # exercise_payoff: Callable|np.ndarray|pd.DataFrame, the payoff of early exercise, if callable, it takes fixing as input, if numpy array or pandas dataframe, it must have the same shape as cashflows.
+    # observable: pd.DataFrame, the observable for early exercise, usually the fixing values of underling value.
+
+    today = ql.Date().todaysDate()
+    settlmentDate = today + ql.Period('2D')
+    paymentSchedule = ql.MakeSchedule(settlmentDate, settlmentDate + ql.Period('1Y'), ql.Period('3M'))
+    paymentSchedule = [d for d in paymentSchedule]
+    fixingSchedule = [d - ql.Period('2D') for d in paymentSchedule]
+    notional = 1_000
+
+    # we use mock data for cashflows, discountFactors, fixing, and payoff in this example.
+    # in real case it depends on the contract type and the model used.
+    cashflows = pd.DataFrame(np.random.randn(len(paymentSchedule), 3) * notional, index=paymentSchedule)
+    discountFactor = pd.DataFrame([1/((1+np.random.uniform(0,0.05))) for i in range(len(paymentSchedule))], index=paymentSchedule)
+    fixing = pd.DataFrame(np.random.randn(len(paymentSchedule), 3), index=fixingSchedule)
+    payoff = lambda fixing: np.maximum(fixing - 1, 0)
+    exercise_schedule = pd.Series(np.ones(len(paymentSchedule), dtype=bool), index=paymentSchedule)
+    exercise_schedule.iloc[0] = False
+    ls = LongstaffSchwartz(cashflows, discountFactor, exercise_schedule, payoff, fixing)
+    ls.backward_induction()
+
+    # demostration of instance function of LongstaffSchwartz class
+    print(f'\nvaluation: {ls.valuations().mean():,.2f}')  # valuation of each path, take average to get expetated value.
+    print(f'\nconfidence interval: {ls.confidence_interval()}')  # confidence interval of the valuation
+    print(f'\nsurvival probability: {ls.survival_probability()}')  # survival probability of the contract
+    print(f'\nexercise cashflows: \n{ls.exercise_cashflows()}') # expected value of exercise payoff with consideration of early exercise.
+    print(f'\nexercise mask: \n{ls.exercise_mask()}')  # whether exercise at each time step and each path
+
+
+

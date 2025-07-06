@@ -313,56 +313,106 @@ class MultiAssetModel():
         
 
 if __name__ == '__main__':
-    heston_vol_df = pd.DataFrame({
-        'option_tenor': ['1M', '2M', '3M', '6M', '9M'],
-        'strike': [0.015, 0.018, 0.02, 0.022, 0.025],
-        'vol': [0.015, 0.018, 0.02, 0.022, 0.025]
-    }) 
-    black_vol_df = pd.Series([0.015, 0.018, 0.02, 0.022, 0.025], index=['1M', '2M', '3M', '6M', '9M']) 
-    vol_curve = create_black_vol_curve(black_vol_df, ql.Date().todaysDate())
-    spot = 0.02
+    # Example 1: Black-Scholes-Merton Model (simple equity option)
+    print('--- Black-Scholes-Merton Model Example ---')
+    import QuantLib as ql
+    import pandas as pd
+    from vol_helper import create_black_vol_curve
+    from models import BlackScholesMertonModel
     today = ql.Date().todaysDate()
     dayCount = ql.Actual365Fixed()
-    riskFreeCurve = ql.FlatForward(today, 0.04, dayCount)
-    dividendCurve = ql.FlatForward(today, 0.01, dayCount)
-    black_model = BlackScholesMertonModel(riskFreeCurve, dividendCurve, vol_curve, spot)
-    heston_model = HestonModel(riskFreeCurve, dividendCurve, ql.TARGET())
-    heston_model.calibrate(heston_vol_df, spot)
-    fixingSchedule = ql.Schedule(today, today + ql.Period('1Y'), ql.Period('1M'), ql.TARGET(), ql.Following, ql.Following, ql.DateGeneration.Backward, False)
-    paths = heston_model.monte_carlo_paths(fixingSchedule, 2**2)
-    print([d for d in fixingSchedule])
-    print(paths)
-    print(heston_model.calibration_detail)
-    spot=100
-    black_model = BlackScholesMertonModel(riskFreeCurve, dividendCurve, vol_curve, spot)
-    paths = black_model.monte_carlo_paths(fixingSchedule, 2**2)
-    print(f'\npath of black_model: \n{paths}')
+    calendar = ql.WeekendsOnly()
+    spot = 100
+    riskFreeCurve = ql.FlatForward(today, 0.04, dayCount)  # Usually don't use flat curve in real world, just simplify for example.
+    dividendCurve = ql.FlatForward(today, 0.01, dayCount)  # Usually don't use flat curve in real world, just simplify for example.
+    black_vol_df = pd.Series([0.015, 0.018, 0.02, 0.022, 0.025], index=['1M', '2M', '3M', '6M', '9M'])
+    
+    # constant volatility
+    const_vol = ql.BlackConstantVol(today, calendar, 0.02, dayCount)
+    black_model_const_vol = BlackScholesMertonModel(riskFreeCurve, dividendCurve, const_vol, spot)
+    # volatility curve
+    vol_curve = create_black_vol_curve(black_vol_df, today)
+    black_model_vol_curve = BlackScholesMertonModel(riskFreeCurve, dividendCurve, vol_curve, spot)
 
-    fxModel=GarmanKohlagenProcessModel(riskFreeCurve, dividendCurve, vol_curve, spot)
-    paths = fxModel.monte_carlo_paths(fixingSchedule, 2**2)
-    print(f'\npath of fxModel: \n{paths}')
-
+    # volatility surface
     df_vol_surface = get_volatility_surface('AAPL', ['1M', '2M', '3M', '6M', '9M'], [100, 110, 120, 130, 140])
+    vol_surface = create_black_vol_surface(df_vol_surface, today)
+    black_model_vol_surface = BlackScholesMertonModel(riskFreeCurve, dividendCurve, vol_surface, spot)
+    
+    fixingSchedule = ql.Schedule(today, today + ql.Period('1Y'), ql.Period('1M'), calendar, ql.Following, ql.Following, ql.DateGeneration.Backward, False)
+    paths = black_model_vol_curve.monte_carlo_paths(fixingSchedule, 4)
+    print(paths)
 
-    spot = 70
-    vol_surface = create_black_vol_surface(df_vol_surface, ql.Date().todaysDate())
-    equity_model = BlackScholesMertonModel(riskFreeCurve, dividendCurve, vol_surface, spot)
-    paths = equity_model.monte_carlo_paths(fixingSchedule, 2**2)
-    print(f'\npath of equity_model: \n{paths}')
+    # Example 2: Heston Model (stochastic volatility)
+    print('\n--- Heston Model Example ---')
+    import pandas as pd
+    import QuantLib as ql
+    from models import HestonModel
+    today = ql.Date().todaysDate()
+    dayCount = ql.Actual365Fixed()
+    calendar = ql.WeekendsOnly()
+    heston_vol_df = pd.DataFrame({
+        'option_tenor': ['1M', '2M', '3M', '6M', '9M'],
+        'strike': [100, 110, 120, 130, 140],
+        'vol': [0.015, 0.018, 0.02, 0.022, 0.025]
+    })
+    spot = 100
+    riskFreeCurve = ql.FlatForward(today, 0.04, dayCount)  # Usually don't use flat curve in real world, just simplify for example.
+    dividendCurve = ql.FlatForward(today, 0.01, dayCount)  # Usually don't use flat curve in real world, just simplify for example.
+    heston_model = HestonModel(riskFreeCurve, dividendCurve, calendar)
+    heston_model.calibrate(heston_vol_df, spot)
+    fixingSchedule = ql.Schedule(today, today + ql.Period('1Y'), ql.Period('1M'), calendar, ql.Following, ql.Following, ql.DateGeneration.Backward, False)
+    paths = heston_model.monte_carlo_paths(fixingSchedule, 4)
+    print(paths)
 
+    # Example 3: Garman-Kohlagen FX Model
+    print('\n--- Garman-Kohlagen Process Model Example ---')
+    import QuantLib as ql
+    from models import GarmanKohlagenProcessModel
+    today = ql.Date().todaysDate()
+    dayCount = ql.Actual365Fixed()
+    calendar = ql.WeekendsOnly()
+    spot = 1.3
+    domestic_curve = ql.FlatForward(today, 0.04, dayCount) # Usually don't use flat curve in real world, just simplify for example.
+    foreign_curve = ql.FlatForward(today, 0.05, dayCount) # Usually don't use flat curve in real world, just simplify for example.
+    
+    # constant volatility
+    const_vol = ql.BlackConstantVol(today, calendar, 0.2, dayCount) # Usually don't use flat curve in real world, just simplify for example.
+    fxModel = GarmanKohlagenProcessModel(foreign_curve, domestic_curve, const_vol, spot)
+    
+    # volatility curve
+    black_vol_df = pd.Series([0.015, 0.018, 0.02, 0.022, 0.025], index=['1M', '2M', '3M', '6M', '9M'])
+    vol_curve = create_black_vol_curve(black_vol_df, today)
+    fxModel = GarmanKohlagenProcessModel(foreign_curve, domestic_curve, vol_curve, spot)
+    
+    # volatility surface
+    df_vol_surface = get_volatility_surface('AAPL', ['1M', '2M', '3M', '6M', '9M'], [100, 110, 120, 130, 140])
+    vol_surface = create_black_vol_surface(df_vol_surface, today)
+    fxModel = GarmanKohlagenProcessModel(foreign_curve, domestic_curve, vol_surface, spot)
+    
+
+
+    fixingSchedule = ql.Schedule(today, today + ql.Period('1Y'), ql.Period('1M'), calendar, ql.Following, ql.Following, ql.DateGeneration.Backward, False)
+    paths = fxModel.monte_carlo_paths(fixingSchedule, 4)
+    print(paths)
+
+    # Example 4: Multi-Asset Model
+    print('\n--- Multi-Asset Model Example ---')
+    import QuantLib as ql
+    from models import MultiAssetModel
+    today = ql.Date().todaysDate()
+    dayCount = ql.Actual365Fixed()
+    calendar = ql.WeekendsOnly()
     corrMatrix = [[1, 0.5], [0.5, 1]]
-    processes = [black_model.process, equity_model.process]
+    # Reuse black_model and fxModel from above
+    processes = [black_model_vol_curve.process, fxModel.process]  # note: don't support heston model as sub-process
     multiAssetModel = MultiAssetModel(processes, corrMatrix)
-    paths = multiAssetModel.monte_carlo_paths(fixingSchedule, 2**2)
-    print(f'\npath of multiAssetModel:')
-    for path in paths:
-        print(path)
-    
-    
+    fixingSchedule = ql.Schedule(today, today + ql.Period('1Y'), ql.Period('1M'), calendar, ql.Following, ql.Following, ql.DateGeneration.Backward, False)
+    paths = multiAssetModel.monte_carlo_paths(fixingSchedule, 4)
+    print(paths)
 
-    
-    
-
-        
-        
-        
+    # Example 5: Get Volatility Surface (utility)
+    print('\n--- Volatility Surface Example ---')
+    from market_data import get_volatility_surface
+    df_vol_surface = get_volatility_surface('AAPL', ['1M', '2M', '3M', '6M', '9M'], [100, 110, 120, 130, 140])
+    print(df_vol_surface)

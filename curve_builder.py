@@ -5,7 +5,7 @@ from rate_helpers import (
     create_USD_deposit_rate_helpers,
     create_EUR_deposit_rate_helpers,
     create_JPY_deposit_rate_helpers,
-    create_TWDeposit_rate_helpers,
+    create_TWD_deposit_rate_helpers,
     create_CHF_deposit_rate_helpers,
     create_GBP_deposit_rate_helpers,
     create_USD_swap_rate_helpers,
@@ -176,7 +176,7 @@ def bootstrap_TWD_curve(settlementDate, deposit: pd.DataFrame=None, swap: pd.Dat
 
     helpers = []
     if deposit is not None:
-        deposit_helpers = create_TWDeposit_rate_helpers(deposit)
+        deposit_helpers = create_TWD_deposit_rate_helpers(deposit)
         helpers+=deposit_helpers
     
     if swap is not None:
@@ -188,35 +188,31 @@ def bootstrap_TWD_curve(settlementDate, deposit: pd.DataFrame=None, swap: pd.Dat
 
 if __name__ == '__main__':
         
-    df_deposit = pd.DataFrame({
-        'tenor': ['1M', '2M', '3M', '6M', '9M'],
-        'rates': [0.015, 0.018, 0.02, 0.022, 0.025]
-    })
-
-    df_swap = pd.DataFrame({
-        'rate': [0.015, 0.018, 0.02, 0.022, 0.025],
-        'tenor': ['1Y', '2Y', '5Y', '7Y', '10Y']
-    })
     today = ql.Date().todaysDate()
+
+    # example: use helpers to bootstrap curve
+    df_deposit = pd.DataFrame({'tenor': ['1M', '2M', '3M', '6M', '9M'], 'rates': [0.015, 0.018, 0.02, 0.022, 0.025]})
     deposit_helpers = create_USD_deposit_rate_helpers(df_deposit)
+
+    df_swap = pd.DataFrame({'rate': [0.015, 0.018, 0.02, 0.022, 0.025],'tenor': ['1Y', '2Y', '5Y', '7Y', '10Y']})
     swap_helpers = create_USD_swap_rate_helpers(df_swap)
-    helpers = deposit_helpers + swap_helpers
 
-    curve = bootstrap_curve_with_instrument_helpers(today, deposit_helpers, ql.Actual360())
+    curve = bootstrap_curve_with_instrument_helpers(today, deposit_helpers, ql.Actual360())  # use deposit helper only
+    curve = bootstrap_curve_with_instrument_helpers(today, deposit_helpers + swap_helpers, ql.Actual360())  # use deposit and swap helpers
 
-
-    curve = bootstrap_curve(today, ql.Actual360(), deposit=(df_deposit, Conventions.USFixedLegConventions()), swap=(df_swap, Conventions.USFixedLegConventions(), Conventions.USFloatingLegConventions()))
-    curve = bootstrap_USD_curve(today, deposit=df_deposit, swap=df_swap)
-    curve = bootstrap_EUR_curve(today, deposit=df_deposit, swap=df_swap)
-    curve = bootstrap_JPY_curve(today, deposit=df_deposit, swap=df_swap)
-    curve = bootstrap_GBP_curve(today, deposit=df_deposit, swap=df_swap)
-    curve = bootstrap_TWD_curve(today, deposit=df_deposit, swap=df_swap)
+    # example: directly use dataFrame or use fast builder
+    curve = bootstrap_curve(
+        today, ql.Actual360(), 
+        deposit=(df_deposit, Conventions.USFixedLegConventions()), 
+        swap=(df_swap, Conventions.USFixedLegConventions(), 
+        Conventions.USFloatingLegConventions())
+        )
+    curve = bootstrap_USD_curve(today, deposit=df_deposit, swap=df_swap)  # fast builder for USD curve without conventions
+    curve = bootstrap_EUR_curve(today, deposit=df_deposit, swap=df_swap)  # fast builder for EUR curve without conventions
+    curve = bootstrap_JPY_curve(today, deposit=df_deposit, swap=df_swap)  # fast builder for JPY curve without conventions
+    curve = bootstrap_GBP_curve(today, deposit=df_deposit, swap=df_swap)  # fast builder for GBP curve without conventions
+    curve = bootstrap_TWD_curve(today, deposit=df_deposit, swap=df_swap)  # fast builder for TWD curve without conventions
     schedule = ql.MakeSchedule(today, today + ql.Period(3, ql.Months), ql.Period('1W'))
-
-
-    print(curve.dayCounter())
-    for d in schedule:
-        print(f'{d}: {curve.zeroRate(d, curve.dayCounter(), ql.Simple).rate()}')
 
 
 
