@@ -101,20 +101,6 @@ year_fraction_rec = np.array(year_fraction(recSchedule, dayCount, accoumulative=
 fixed_cashflows = pd.DataFrame(notional * fixed_rate * year_fraction_rec, index=recSchedule)
 print(f'\nfixed_cashflows: \n{fixed_cashflows}')
 
-
-# floating cashflows
-
-# Approach 1
-# fixing_date_map = pd.Series(fixingSchedule, index=paymentSchedule)
-# fixing_date = fixing_date_map[paySchedule]   # 1. get fixing date from map
-# fixing_value = pd.DataFrame(fixings.loc[fixing_date].values, index=paySchedule) # 2. get fixing value from fixings with corresponding fixing date
-# fixing_in_advance = True  # 3. process fixing-in-advance case if True
-# if fixing_in_advance:
-#     fixing_value = fixing_value.shift(1)
-# year_fraction_pay = np.array(year_fraction(paySchedule, dayCount, accoumulative=False))[:,np.newaxis] # 4. get year fraction for pay leg
-# floating_cashflows = notional * fixing_value * year_fraction_pay # 5. calculate floating cashflows
-
-
 fixingSchedule = [calendar.advance(d,ql.Period(-2, ql.Days)) for d in paySchedule]  # 1. fixing days only for payschedule
 fixing_value = fixings.loc[fixingSchedule]  # 2. get fxing value with fixing days
 if fixing_in_advance:  # 3. process fixing-in-advance case if True

@@ -18,65 +18,79 @@ class LongstaffSchwartz():
 
         
 
-    def backward_induction(self):
+    def backward_induction(self, verbose=False):
         np.set_printoptions(precision=2, suppress=True)
         pd.set_option('display.float_format', lambda x: f'{x:,.2f}')
         self.regressors = []
         self._exercise_cashflows = pd.DataFrame(np.zeros(self.cashflows.shape), index=self.cashflows.index, columns=self.cashflows.columns)
         valuation = np.zeros(self.cashflows.shape[1])  # shape_single_step
-        print(f'valuation.shape: {valuation.shape}, type: {type(valuation)}')
+        if verbose:
+            print(f'valuation.shape: {valuation.shape}, type: {type(valuation)}')
         survival = pd.DataFrame(
             np.ones(self.cashflows.shape,dtype=bool),  # or proper shape
             index=self.cashflows.index,
             columns=self.cashflows.columns
             
         )
-        print('\n ****************Backward Longstaff-Schwartz method begin:*******************')
+        if verbose:
+            print('\n ****************Backward Longstaff-Schwartz method begin:*******************')
         for d in reversed(self.cashflows.index):
-            print(f'\nTime step {d}')
+            if verbose:
+                print(f'\nTime step {d}')
             current_cf = self.cashflows.loc[d]
             if self.exercise_schedule.loc[d]:
-                print('\n  Process exercise')
-                print(f'Valuation of future cf:')
-                print(np.round(valuation, 2))
+                if verbose:
+                    print('\n  Process exercise')
+                    print(f'Valuation of future cf:')
+                    print(np.round(valuation, 2))
                 reg = linear_model.LinearRegression()
                 nearest_fixing_date = get_nearest_fixing_date(d, self.observable.index)
-                print(f'using fixing date: {nearest_fixing_date} for early exercise call date: {d}')
+                if verbose:
+                    print(f'using fixing date: {nearest_fixing_date} for early exercise call date: {d}')
                 x = self.observable.loc[nearest_fixing_date].values.reshape(-1, 1)
                 reg.fit(x, valuation)
                 y = reg.predict(x)
-                print(f'Predicted valuation of not exercising: {np.round(y, 2)}')
+                if verbose:
+                    print(f'Predicted valuation of not exercising: {np.round(y, 2)}')
                 exe_payoff = self.exercise_payoff_func(self.observable.loc[nearest_fixing_date,:].values)
                 self._exercise_cashflows.loc[d] = exe_payoff
-                print(f'payoff of early exercise: {np.round(exe_payoff, 2)}')
+                if verbose:
+                    print(f'payoff of early exercise: {np.round(exe_payoff, 2)}')
                 not_exercise = y > exe_payoff
                 exercise = y < exe_payoff
-                print(f'Whether to exercise: {exercise}')
+                if verbose:
+                    print(f'Whether to exercise: {exercise}')
 
                 optimized = not_exercise * valuation + exercise * exe_payoff
-                print('optimized value:')
-                print(np.round(optimized, 2))
+                if verbose:
+                    print('optimized value:')
+                    print(np.round(optimized, 2))
                 valuation = current_cf + optimized
-                print('cashflow of current step:')
-                print(np.round(current_cf, 2))
-                print('optimized value plus current cf:')
-                print(np.round(valuation, 2))
+                if verbose:
+                    print('cashflow of current step:')
+                    print(np.round(current_cf, 2))
+                    print('optimized value plus current cf:')
+                    print(np.round(valuation, 2))
                 survival.loc[d,:] = not_exercise
                 self.regressors.insert(0, reg)
             else:
-                print('\n   No early exercise, add current')
-                print('Valuation of future cf:')
-                print(np.round(valuation, 2))
+                if verbose:
+                    print('\n   No early exercise, add current')
+                    print('Valuation of future cf:')
+                    print(np.round(valuation, 2))
                 valuation = current_cf + valuation
-                print('cashflow of current step:')
-                print(np.round(current_cf, 2))
-                print('Futre npv plus current cf:')
-                print(np.round(valuation, 2))
+                if verbose:
+                    print('cashflow of current step:')
+                    print(np.round(current_cf, 2))
+                    print('Futre npv plus current cf:')
+                    print(np.round(valuation, 2))
             valuation = self.discountFactors.loc[d].values * valuation
-            print('discount:')
-            print(np.round(valuation, 2))
+            if verbose:
+                print('discount:')
+                print(np.round(valuation, 2))
         self.valuation = valuation
-        print(f'valuation of monte carlo simulation: {valuation.mean():,.2f}')
+        if verbose:
+            print(f'valuation of monte carlo simulation: {valuation.mean():,.2f}')
         self.survival = survival
 
 
