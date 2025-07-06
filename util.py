@@ -7,6 +7,11 @@ def subset_to_bool(subset_dates, full_dates)->pd.Series:
     subset_dates: list-like or index-like, must be a subset of full_dates
     full_dates: list-like or index-like
     """
+    if not isinstance(full_dates, list):
+        full_dates = [d for d in full_dates]
+    if not isinstance(subset_dates, list):
+        subset_dates = [d for d in subset_dates]
+    
     subset_set = set(subset_dates)
     return pd.Series([date in subset_set for date in full_dates], index=full_dates)
     
@@ -14,7 +19,19 @@ def get_nearest_fixing_date(d, obs_index):
     # Returns the greatest date in obs_index that is <= d
     return max([date for date in obs_index if date <= d])
 
-def year_fraction(schedule, dayCount, accoumulative=False):
+def year_fraction(schedule, dayCount: ql.DayCounter, accoumulative=False):
+    """
+    Calculate year fractions for a schedule of dates using a specified day count convention.
+
+    Parameters:
+        schedule (list or ql.Schedule): List of dates or a QuantLib Schedule object.
+        dayCount: QuantLib DayCounter object used to compute year fractions.
+        accoumulative (bool, optional): If True, returns the year fraction from the first date to each date in the schedule (accumulative). If False, returns the year fraction between each consecutive pair of dates (default).
+
+    Returns:
+        list: List of year fractions. If accoumulative is False, the first element is 0.
+    """
+
     if isinstance(schedule, ql.Schedule):
         schedule = [d for d in schedule]
     if not isinstance(schedule, list):
@@ -46,3 +63,34 @@ def leg_to_series(leg):
         dates.append(dt)
         amounts.append(cf.amount())
     return pd.DataFrame({'amount': amounts}, index=dates)
+
+
+if __name__ == '__main__':
+    # Example for subset_to_bool
+    subset_dates = ql.MakeSchedule(ql.Date(15,6,2020), ql.Date(15,6,2021), ql.Period('6M'))
+    full_dates = ql.MakeSchedule(ql.Date(15,6,2020), ql.Date(15,6,2021), ql.Period('3M'))
+    print('subset_to_bool:', subset_to_bool(subset_dates, full_dates))
+
+    # Example for get_nearest_fixing_date
+    d = ql.Date(15, 6, 2020)
+    schedule = ql.MakeSchedule(ql.Date(1,1,2020), ql.Date(1,1,2021), ql.Period('1M'))
+    print('get_nearest_fixing_date:', get_nearest_fixing_date(d, schedule))
+
+    # Example for year_fraction
+    schedule = [ql.Date(1, 1, 2020), ql.Date(1, 7, 2020), ql.Date(1, 1, 2021)]
+    dayCount = ql.Actual360()
+    print('year_fraction (acculumative):', year_fraction(schedule, dayCount, accoumulative=True))
+    print('year_fraction (between pairs):', year_fraction(schedule, dayCount, accoumulative=False))
+
+    # Example for combine_schedule
+    schedule1 = ql.MakeSchedule(ql.Date(15,6,2020), ql.Date(15,6,2021), ql.Period('6M'))
+    schedule2 = ql.MakeSchedule(ql.Date(15,6,2020), ql.Date(15,6,2021), ql.Period('3M'))
+    print('combine_schedule:', combine_schedule(schedule1, schedule2))
+
+    # Example for leg_to_series
+    # Create a mock leg with minimal QuantLib CashFlow-like objects
+    schedule = ql.MakeSchedule(ql.Date(15,6,2020), ql.Date(15,6,2021), ql.Period('6M'))
+    dayCount = ql.Actual360()
+    leg = ql.FixedRateLeg(schedule, dayCount, [100.], [0.05])
+    print('leg_to_series:\n', leg_to_series(leg))
+
