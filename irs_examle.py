@@ -11,8 +11,7 @@ from rate_helpers import (
     create_OIS_helper,
     create_fra_rate_helpers,  # <-- corrected
     create_bond_helper,
-    create_sofr_future_rate_helpers
-)
+    create_sofr_future_rate_helpers)
 from curve_builder import bootstrap_USD_curve, bootstrap_EUR_curve, bootstrap_JPY_curve, bootstrap_GBP_curve, bootstrap_TWD_curve
 from conventions import Conventions
 from typing import Literal, Tuple
@@ -20,15 +19,23 @@ from curve_builder import bootstrap_curve_with_instrument_helpers, bootstrap_cur
 from vol_helper import (
     create_USD_swaption_helpers, create_EUR_swaption_helpers,
     create_JPY_swaption_helpers, create_GBP_swaption_helpers,
-    create_CHF_swaption_helpers, create_TWD_swaption_helpers
-)
-
+    create_CHF_swaption_helpers, create_TWD_swaption_helpers)
 from curve_builder import bootstrap_USD_curve
 from util import get_nearest_fixing_date, year_fraction, combine_schedule
 from leastSquareError import LongstaffSchwartz
 from models import HullWhiteModel
-
 from market_data import (get_deposit, get_swap, get_swaption, get_FRA, get_sofr_future)
+
+# fixed rate cancellable IRS
+
+
+# rec fixed leg, 30/360, frequency 6M
+# pay floating: index: 6M libor, act/360, frequency 6M
+# cancelable schedule: same as fixed leg frequency
+# floating leg fixing schedule: 2 days before payment date, fixing-in-advance
+# tenor: 3Y
+# fixing rate: 1.8%, notional: 1M USD
+
 
 # conventions
 fixed_leg_conventions = Conventions.USFixedLegConventions()
@@ -36,13 +43,13 @@ floating_leg_conventions = Conventions.USFloatingLegConventions()
 calendar = fixed_leg_conventions['calendar']
 date_rolling_convention = fixed_leg_conventions['date_rolling_convention']
 date_termination_convention = fixed_leg_conventions['date_termination_convention']
-frequency = floating_leg_conventions['frequency']
+frequency = ql.Period('6M')
 dayCount = fixed_leg_conventions['dayCounter']
 currency = fixed_leg_conventions['currency']
 endOfMonth = fixed_leg_conventions['endOfMonth']
 rule = fixed_leg_conventions['rule']
 
-
+# set evaluation date
 today = ql.Date().todaysDate()
 today = calendar.advance(today,ql.Period(0, ql.Days))  # ensure today is a business day (In case of using in non-trading day)
 settlementDate = calendar.advance(today,ql.Period(2, ql.Days))

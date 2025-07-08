@@ -101,15 +101,10 @@ notional = 1_000_000
 print(f'fixed_rate: {fixed_rate}')
 print(f'notional: {notional}')
 
-# use quantlib to calculate fixed cashflows
-
 
 paySchedule = [d for d in paySchedule]
 recSchedule = [d for d in recSchedule]
 
-# quantlib fixed cashflows
-# fixed_cashflows = ql.FixedRateLeg(recSchedule, dayCount, [notional], [fixed_rate])
-# fixed_cashflows = leg_to_series(fixed_cashflows)
 
 
 year_fraction_rec = np.array(year_fraction(recSchedule, dayCount, accoumulative=False))
@@ -118,8 +113,6 @@ print(f'\nfixed_cashflows: \n{fixed_cashflows}')
 print(f'\nfixings: \n{fixings}')
 
 # range acrual cashflows
-
-
 start_date = paySchedule[0]
 groups=[]
 last_n = 3

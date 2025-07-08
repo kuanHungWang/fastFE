@@ -31,6 +31,28 @@ from models import HullWhiteModel, HestonModel
 from market_data import (get_deposit, get_swap, get_swaption, get_FRA, get_sofr_future)
 
 
+
+notional = 1_000_000
+bermudian_knock_out = 1.1
+strike = 1.0
+european_knock_in = 0.95
+coupon_rate = 0.1
+fixing_in_advance = True
+
+# equity swap
+# tenor: 3Y, frequency 3M
+# receive fixed coupon: 10% annualy, 30/360
+# pay 3M libor, act/360.  fixing-in-advance, 2 days before payment date
+# bermudian knock-out: 110% of initial stock price
+# european knock-in: 95% of initial stock price
+# stike: 100% of initial stock price
+
+# auto call: for each payment date, if the stock price is higher than the strike, the whole contract will be terminated and no more further cashflow after that payment date.
+# final sell put:
+# if auto call has not occur by the final payment date and last stock price is lower than european knock-in
+# pay max(S_T - strike, 0)
+
+
 # conventions
 fixed_leg_conventions = Conventions.USFixedLegConventions()
 floating_leg_conventions = Conventions.USFloatingLegConventions()
