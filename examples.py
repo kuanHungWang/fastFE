@@ -354,3 +354,37 @@ exercise_schedule = pd.Series(np.ones(len(paymentSchedule), dtype=bool), index=p
 exercise_schedule.iloc[0] = False
 ls = LongstaffSchwartz(cashflows, discountFactor, exercise_schedule, payoff, fixing)
 ls.backward_induction()
+
+
+#***
+# calculate floating cashflow with libor index in deterministic interest rate environment.
+yieldCurve = ql.FlatForward(today, 0.04, ql.Actual365Fixed())  # In real world we usually don't use flat forward curve, here just for example.
+libor_index = ql.IborIndex('MyIndex', ql.Period('6m'), 2, currency, calendar, date_rolling_convention, True, libor_dayCount, ql.YieldTermStructureHandle(yieldCurve))
+libor_fixings = [libor_index.fixing(d) for d in fixingSchedule]  # get fixing values for each fixing date from index using .fixing() method
+libor_fixings = pd.DataFrame(libor_fixings, paymentSchedule)  # convert to pandas DataFrame for easy manipulation, notes that we use paymentSchedule as index, not fixingSchedule, in order to align with other cashflow, discount factor, etc.
+if fixing_in_advance:
+    libor_fixings = libor_fixings.shift(1)  # as we shift, first item will become NaN, but this is fine since we don't have payment in the first date.
+libor_year_fraction = np.array(year_fraction(paymentSchedule, libor_dayCount, accoumulative=False))[:, np.newaxis]  # reshape to (n, 1) for broadcast.
+libor_cashflows = notional * libor_fixings * libor_year_fraction
+
+#***
+# calculate floating cashflow with libor index in stochastic interest rate with multiple simulation paths of fixing.
+
+# fixings = ...  # get fixing_value from model or other sources.
+
+# step 1. get fixing rate of floating index, here are three ways of doing it, all have same result.
+# method 1: The easiest way, use fixings as it is.
+fixing_value = fixings.shift(1) if fixing_in_advance else fixings
+
+# method 2: If fixings is not just generated for this leg. For example, floating leg freqency is 6m, but fixing is generated in freqency of 3M for other purposes.
+fixingSchedule = [calendar.advance(d,ql.Period(-2, ql.Days)) for d in paySchedule]  
+# method 3: A more robustic versio of 1.2, especially for fixing is not in daily basis, but if fixing is available for every business day, this may not get you truely 2 business days before payment date.
+fixingSchedule = [get_nearest_fixing_date(d, fixings.index) for d in paySchedule] 
+fixing_value = fixings.loc[fixingSchedule]  
+if fixing_in_advance:  # process fixing-in-advance case if True (for method 2 and 3)
+    fixing_value = fixing_value.shift(1)
+year_fraction_pay = np.array(year_fraction(paySchedule, dayCount, accoumulative=False))[:,np.newaxis] # step 2. get year fraction for pay leg, use np.newaxis to reshape to (n, 1) for broadcast
+floating_cashflows = notional * fixing_value.values * year_fraction_pay  # step 3. calculate floating cashflows
+floating_cashflows = pd.DataFrame(floating_cashflows, index=paySchedule)  # step 4. convert to dataframe, use paySchedule as index to align with other cashflows.
+
+

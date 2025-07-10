@@ -104,9 +104,7 @@ class LongstaffSchwartz():
         return [mean - std * np.sqrt(alpha/2), mean + std * np.sqrt(alpha/2)]
         
     def survival_probability(self):
-        print(f'original survival: \n', self.survival)
         survival = self.survival.cumprod(axis=0)
-        print(f'cumprod survival: \n', survival)
         self.accumulated_survival = survival
         return survival.mean(axis=1)
 
@@ -123,7 +121,6 @@ class LongstaffSchwartz():
     def exercise_cashflows(self):
         exercise_mask = self.exercise_mask()
         cf = self._exercise_cashflows * exercise_mask
-        print(f'exercise cashflows: \n{cf}')
         return cf.mean(axis=1)
 
 if __name__ == '__main__':
