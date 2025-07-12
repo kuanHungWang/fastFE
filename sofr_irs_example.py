@@ -36,6 +36,10 @@ from market_data import (get_deposit, get_swap, get_swaption, get_FRA, get_sofr_
 # tenor: 3Y
 # fixing rate: 1.8%, notional: 1M USD
 
+# contract parameters
+fixed_rate = 0.018
+notional = 1_000_000
+fixing_in_advance = True
 
 # conventions
 calendar = ql.UnitedStates(ql.UnitedStates.Settlement)
@@ -92,16 +96,16 @@ underlying_path, fixings, discountFactors = hw_model.monte_carlo_paths([create_s
 # 3. argument of index_factories is a list of functions that return an ibor index.
 # 4. the number of fixings in fixings is determined by the number of index_factories.
 
-fixings=fixings[0]
-print(f'fixings: \n{fixings}')
-
-# cashflow according to monte carlo paths.
-fixed_rate = 0.018
-notional = 1_000_000
-fixing_in_advance = True
 # convert to list
 paySchedule = [d for d in paySchedule]
 recSchedule = [d for d in recSchedule]
+
+fixings=fixings[0]
+print(f'fixings: \n{fixings}')
+
+
+
+
 
 
 # fixed cashflows

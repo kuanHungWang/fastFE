@@ -34,6 +34,9 @@ from models import HullWhiteModel
 # notional 1M USD
 # cancelable schedule: same as fixed leg frequency
 
+# contract parameters
+fixed_rate = 0.018
+notional = 1_000_000
 
 # conventions
 calendar = ql.UnitedStates(ql.UnitedStates.Settlement)
@@ -103,15 +106,16 @@ def create_ibor_6M(ts):
 underlying_path, fixings, discountFactors = hw_model.monte_carlo_paths([create_2Y_CMS, create_ibor_6M], fixingSchedule, paymentSchedule, n_path)
 # underlying_path, fixings, discountFactors are dataframes with index of ql.Date.
 
-
-fixed_rate = 0.018
-notional = 1_000_000
-print(f'fixed_rate: {fixed_rate}')
-print(f'notional: {notional}')
-
-
 paySchedule = [d for d in paySchedule]
 recSchedule = [d for d in recSchedule]
+
+
+
+
+
+
+
+
 
 print(f'paySchedule: \n{paySchedule}')
 print(f'recSchedule: \n{recSchedule}')

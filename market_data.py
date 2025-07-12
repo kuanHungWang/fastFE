@@ -160,7 +160,45 @@ def get_volatility_surface(ticker: str, tenor: List[str], strikes: List[float]) 
     df = df.rolling(window=3, min_periods=1, center=True).mean()
     return df
 
+def get_price(ticker: str) -> float:
+    """
+    Get mock price for given ticker.
+
+    Args:
+        ticker (str): Ticker of the asset.
     
+    Returns:
+        float: Price of the asset.
+    """
+    if ticker == 'EUR':
+        return np.random.uniform(1, 1.2)
+
+    elif ticker == 'JPY':
+        return np.random.uniform(130, 150)
+    elif ticker == 'GBP':
+        return np.random.uniform(1.2, 1.4)
+    elif ticker == 'CHF':
+        return np.random.uniform(0.9, 1.1)
+    elif ticker == 'TWD':
+        return np.random.uniform(28, 32)
+    elif ticker == 'ZAR':
+        return np.random.uniform(15, 20)
+    elif ticker == 'AUD':
+        return np.random.uniform(0.6, 0.7)
+    else:
+        return np.random.uniform(100, 200)
+
+def get_dividend_rate(ticker: str) -> float:
+    """
+    Get mock dividend rate for given ticker.
+
+    Args:
+        ticker (str): Ticker of the asset.
+    
+    Returns:
+        float: Dividend rate of the asset.
+    """
+    return np.random.uniform(0.01, 0.05)
     
 if __name__ == '__main__':
     deposit = get_deposit(['1M', '2M', '3M', '6M', '9M'])

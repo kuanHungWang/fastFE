@@ -31,17 +31,19 @@ from models import HullWhiteModel, HestonModel, BlackScholesMertonModel, GarmanK
 
 from market_data import (
     get_deposit, get_swap, get_swaption, 
-    get_FRA, get_sofr_future, get_volatility_surface)
+    get_FRA, get_sofr_future, get_volatility_surface, get_price, get_dividend_rate)
 
 # Description:
 # Keywords: fx linked, target redemption, TRF, forward, multi-period.
 # tenor: 1Y
+# underlying: EURUSD
 # notional: EUR 1,000,000
-# frequency: monthly
-# buy EUR against USD at strike, cash settlement
+# payment frequency: monthly
+# At each period, buy EUR against USD at strike, cash settlement in EUR
 # terminate when accumated profit reach target
 # accumulated profit = sum of (EUR fixing - strike) , uncapped
-
+# fixing date: 2 days before payment date
+# contract parameters
 notional = 1_000_000
 strike = 1.1
 target = 0.2
@@ -72,7 +74,7 @@ usd_yieldCurve = bootstrap_USD_curve(today, deposit=usd_deposit, swap=usd_swap)
 
 eurusd_vol = get_volatility_surface('EUR', ['1M', '2M', '3M', '6M', '9M', '12M'], [1.05, 1.07, 1.09, 1.11, 1.13, 1.15])
 vol_surface = create_black_vol_surface(eurusd_vol, today)
-spot = 1.1
+spot = get_price('EUR')
 fx_model = GarmanKohlagenProcessModel(usd_yieldCurve, eur_yieldCurve, vol_surface, spot)
 
 frequency=ql.Period('1M')

@@ -31,20 +31,26 @@ from models import HullWhiteModel, HestonModel, BlackScholesMertonModel, GarmanK
 
 from market_data import (
     get_deposit, get_swap, get_swaption, 
-    get_FRA, get_sofr_future, get_volatility_surface)
+    get_FRA, get_sofr_future, get_volatility_surface, get_price, get_dividend_rate)
 
 # Description:
 # Keywords: fx linked, single currency, daily range accrual, swap.
 # tenor: 1Y
 # notional: 1M 
 # pay 3M Euribor coupon, act360, fixing in advance
-
 # receive daily range accrual coupon, 30/360
 # coupon rate: 2%
 # range: 0.99< EURUSD < 1.2
 # for each payment period, use the fixing value 5 days prior to the payment date for remaining fixing period
 # calculation of range accrual: 
 
+# contract parameters
+notional = 1_000_000
+coupon_rate = 0.02
+upper_bound = 1.2
+lower_bound = 0.99
+fixing_in_advance = True
+n_period_end_replacement = 5
 
 US_calendar = ql.UnitedStates(ql.UnitedStates.NYSE)
 EUR_calendar = ql.TARGET()
@@ -71,7 +77,7 @@ usd_yieldCurve = bootstrap_USD_curve(today, deposit=usd_deposit, swap=usd_swap)
 
 eurusd_vol = get_volatility_surface('EUR', ['1M', '2M', '3M', '6M', '9M', '12M'], [1.05, 1.07, 1.09, 1.11, 1.13, 1.15])
 vol_surface = create_black_vol_surface(eurusd_vol, today)
-spot = 1.1
+spot = get_price('EUR')
 fx_model = GarmanKohlagenProcessModel(usd_yieldCurve, eur_yieldCurve, vol_surface, spot)
 
 frequency=ql.Period('3M')
@@ -88,12 +94,7 @@ paymentSchedule = [d for d in paymentSchedule]
 
 
 
-notional = 1_000_000
-coupon_rate = 0.02
-upper_bound = 1.2
-lower_bound = 0.99
-fixing_in_advance = True
-n_period_end_replacement = 5
+
 
 # libor cash flow under deterministic yield curve.
 ts = ql.YieldTermStructureHandle(eur_yieldCurve)

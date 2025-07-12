@@ -9,6 +9,10 @@ from vol_helper import *
 from leastSquareError import LongstaffSchwartz
 from models import HullWhiteModel, HestonModel, MultiAssetModel, BlackScholesMertonModel, GarmanKohlagenProcessModel
 from market_data import *
+currency = ql.EURCurrency()
+libor_dayCount = ql.Actual360()
+date_rolling_convention = ql.Following
+
 
 #***
 # today's date
@@ -33,6 +37,7 @@ schedule = ql.MakeSchedule(startDate, terminationDate, frequency)
 
 #***
 # Market convention of dates, rolling, daycount, schedule generation
+# keywordsL following, modified following, preceding, modified preceding, forward, backward, third wednesday, twentieth, actual/360, actual/365, thirty/360, 30/360 business/252, calendar, joint calendar
 # date rolling market conventions, used to determine how a date change if it is not a business day
 ql.Following   # Move to next business day if it is not a business day
 ql.ModifiedFollowing   # Move to next business day if it is not a business day, but if the date is the last business day of the month, move to previous business day.
@@ -84,6 +89,7 @@ joint_calendar = ql.JointCalendar(ql.TARGET(), ql.Poland())
 
 #***
 # Rate helper, used to bootstrap yield curve. helper type: deposit, fra, swap, sofr, ois, bond
+
 from datetime import datetime
 df_deposit = pd.DataFrame({'tenor': ['1M', '2M', '3M', '6M', '1Y'], 'rates': [0.015, 0.018, 0.02, 0.022, 0.025]})
 deposit_helpers = create_deposit_rate_helpers(df_deposit, conventions=Conventions.USFixedLegConventions())
@@ -158,7 +164,7 @@ curve = bootstrap_curve_with_instrument_helpers(today, deposit_helpers + swap_he
 
 
 #***
-# Build curve from dataFrame as market data
+# Build curve from  market data dataFrame
 from conventions import Conventions
 today = ql.Date().todaysDate()
 
@@ -172,7 +178,8 @@ curve = bootstrap_curve(
     )
 
 #***
-# Build curve from dataFrame as market data for specific currency witout need to pass conventions, which is the easiest way to build curve
+# Build curve from market data dataFrame for specific currency witout need to pass conventions, which is the easiest way to build curve
+# keywords: USD curve, EUR curve, JPY curve, GBP curve, TWD curve, quick curve builder
 curve = bootstrap_USD_curve(today, deposit=df_deposit, swap=df_swap)  # fast builder for USD curve without conventions
 curve = bootstrap_EUR_curve(today, deposit=df_deposit, swap=df_swap)  # fast builder for EUR curve without conventions
 curve = bootstrap_JPY_curve(today, deposit=df_deposit, swap=df_swap)  # fast builder for JPY curve without conventions
@@ -183,6 +190,7 @@ curve = bootstrap_TWD_curve(today, deposit=df_deposit, swap=df_swap)  # fast bui
 
 #***
 # swaption helper builder, use to calibrate interest rate model.
+# keywords: swaption helper, volatility, interest rate model, calibration
 from curve_builder import bootstrap_USD_curve
 today = ql.Date().todaysDate()
 df_deposit = pd.DataFrame({
@@ -219,6 +227,7 @@ swaption_helpers = create_TWD_swaption_helpers(df_swaption, curve, engine)  # fa
 
 #***
 # heston model helper, use to calibrate heston model.
+# keywords: heston model, volatility, calibration, volatility helper
 heston_vol_df = pd.DataFrame({
     'option_tenor': ['1M', '2M', '3M', '6M', '9M'],
     'strike': [0.015, 0.018, 0.02, 0.022, 0.025],
@@ -232,6 +241,7 @@ heston_helpers = create_heston_model_helper(heston_vol_df, spot, riskFreeCurve, 
 
 #***
 # Black-Scholes-Merton Model (simple equity option)
+# Keywords: Black-Scholes-Merton Model, BSM Model, equity option, constant volatility, volatility curve, volatility surface, local volatility, deterministic volatility, monte carlo, paths generation
 import QuantLib as ql
 import pandas as pd
 from vol_helper import create_black_vol_curve
@@ -251,7 +261,7 @@ black_model_const_vol = BlackScholesMertonModel(riskFreeCurve, dividendCurve, co
 vol_curve = create_black_vol_curve(black_vol_df, today)
 black_model_vol_curve = BlackScholesMertonModel(riskFreeCurve, dividendCurve, vol_curve, spot)
 
-# volatility surface
+# volatility surface, also known as local volatility
 df_vol_surface = get_volatility_surface('AAPL', ['1M', '2M', '3M', '6M', '9M'], [100, 110, 120, 130, 140])
 vol_surface = create_black_vol_surface(df_vol_surface, today)
 black_model_vol_surface = BlackScholesMertonModel(riskFreeCurve, dividendCurve, vol_surface, spot)
@@ -263,6 +273,7 @@ paths = black_model_vol_curve.monte_carlo_paths(fixingSchedule, 4)
 
 #***
 # Heston Model (stochastic volatility)
+# Keywords: Heston Model, stochastic volatility, equity option, calibration, monte carlo, paths generation
 import pandas as pd
 import QuantLib as ql
 from models import HestonModel
@@ -285,6 +296,7 @@ paths = heston_model.monte_carlo_paths(fixingSchedule, 4)
 
 #***
 # Garman-Kohlagen FX Model
+# Keywords: Garman-Kohlagen Model, FX Model, constant volatility, volatility curve, volatility surface, local volatility, deterministic volatility, monte carlo, paths generation
 import QuantLib as ql
 from models import GarmanKohlagenProcessModel
 today = ql.Date().todaysDate()
@@ -303,7 +315,7 @@ black_vol_df = pd.Series([0.015, 0.018, 0.02, 0.022, 0.025], index=['1M', '2M', 
 vol_curve = create_black_vol_curve(black_vol_df, today)
 fxModel = GarmanKohlagenProcessModel(foreign_curve, domestic_curve, vol_curve, spot)
 
-# volatility surface
+# volatility surface, also known as local volatility
 df_vol_surface = get_volatility_surface('AAPL', ['1M', '2M', '3M', '6M', '9M'], [100, 110, 120, 130, 140])
 vol_surface = create_black_vol_surface(df_vol_surface, today)
 fxModel = GarmanKohlagenProcessModel(foreign_curve, domestic_curve, vol_surface, spot)
@@ -316,6 +328,7 @@ print(paths)
 
 #***
 # Multi-Asset Model
+# keyword: multi asset, multi process, hybrid model, hybrid process, monte carlo, paths generation
 import QuantLib as ql
 from models import MultiAssetModel
 today = ql.Date().todaysDate()
@@ -330,12 +343,14 @@ paths = multiAssetModel.monte_carlo_paths(fixingSchedule, 4)
 
 #***
 # Get Volatility Surface (utility)
+# volatility, market data, local volatility, volatility surface
 from market_data import get_volatility_surface
 df_vol_surface = get_volatility_surface('AAPL', ['1M', '2M', '3M', '6M', '9M'], [100, 110, 120, 130, 140])
 
 
 #***
 # LongstaffSchwartz, Bermudan Option, American Option, early exercise, least square error method
+# Keywords: LongstaffSchwartz, Bermudan Option, American Option, early exercise, least square error method
 from leastSquareError import LongstaffSchwartz
 today = ql.Date().todaysDate()
 settlmentDate = today + ql.Period('2D')
@@ -353,7 +368,38 @@ payoff = lambda fixing: np.maximum(fixing - 1, 0)
 exercise_schedule = pd.Series(np.ones(len(paymentSchedule), dtype=bool), index=paymentSchedule)
 exercise_schedule.iloc[0] = False
 ls = LongstaffSchwartz(cashflows, discountFactor, exercise_schedule, payoff, fixing)
-ls.backward_induction()
+ls.backward_induction()  # conduct backward induction for optimized exercise decision
+ls.valuations() # return expected npv, i.e. valuation
+ls.confidence_interval(alpha=0.05) # return confidence interval of the expected npv
+ls.survival_probability() # return survival probability
+ls.exercise_cashflows() # return expected cashflows of early exercise of each period.
+ls.exercise_mask()  # return whether to exercise at each period and each path.
+
+
+#***
+# Create interest rate index
+# Keywords: interest rate index, libor, ibor, euribor, overnight, SOFR, 
+yieldCurve = ql.FlatForward(today, 0.04, ql.Actual365Fixed())
+ibor_index = ql.IborIndex('MyIborIndex', ql.Period('6m'), 2, currency, calendar, date_rolling_convention, True, libor_dayCount, ql.YieldTermStructureHandle(yieldCurve))
+euribor_index = ql.Euribor(ql.Period('6M'), ql.YieldTermStructureHandle(yieldCurve))
+fixingDays = 2
+dayCounter = ql.Actual360()
+overnight_index = ql.OvernightIndex('MyOvernightIndex', fixingDays, currency, calendar, dayCounter, ql.YieldTermStructureHandle(yieldCurve))
+cms10Y =ql.UsdLiborSwapIsdaFixAm(ql.Period('10Y'), ql.YieldTermStructureHandle(yieldCurve))
+
+
+#***
+# Get fixing values of a index
+yieldCurve = ql.FlatForward(today, 0.04, ql.Actual365Fixed())
+ibor_index = ql.IborIndex('MyIborIndex', ql.Period('6m'), 2, currency, calendar, date_rolling_convention, True, libor_dayCount, ql.YieldTermStructureHandle(yieldCurve))
+d = calendar.advance(today,ql.Period(2, ql.Days))
+libor_fixings = ibor_index.fixing(d)
+
+#***
+# get discount factor from a yield curve
+yieldCurve = ql.FlatForward(today, 0.04, ql.Actual365Fixed())
+d = calendar.advance(today,ql.Period("1Y"))
+discount_factor = yieldCurve.discount(d)
 
 
 #***
@@ -406,3 +452,7 @@ for i in range(1, len(paySchedule)):
 floating_cashflows = np.vstack(floating_cashflows)
 floating_cashflows = pd.DataFrame(floating_cashflows, index=paySchedule[1:])
 
+#***
+# Create interest rate index
+# Keywords: libor, ibor, euribor, OIS, SOFR, 
+ql.IborIndex('MyIndex', ql.Period('6m'), 2, currency, calendar, date_rolling_convention, True, libor_dayCount, ql.YieldTermStructureHandle(yieldCurve))

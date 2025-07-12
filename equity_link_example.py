@@ -28,7 +28,7 @@ from util import get_nearest_fixing_date, year_fraction, combine_schedule
 from leastSquareError import LongstaffSchwartz
 from models import HullWhiteModel, HestonModel
 
-from market_data import (get_deposit, get_swap, get_swaption, get_FRA, get_sofr_future)
+from market_data import (get_deposit, get_swap, get_swaption, get_FRA, get_sofr_future, get_price, get_dividend_rate)
 
 
 
@@ -52,6 +52,13 @@ fixing_in_advance = True
 # final sell put:
 # if auto call has not occur by the final payment date and last stock price is lower than european knock-in, pay max(strike - S_T, 0)
 
+# contract parameters
+notional = 1_000_000
+bermudian_knock_out = 1.1
+strike = 1.0
+european_knock_in = 0.95
+coupon_rate = 0.1
+fixing_in_advance = True
 
 # conventions
 
@@ -87,9 +94,10 @@ df_heston_vol = pd.DataFrame({
 
 # create curve and calibrate model by swaptions
 yieldCurve = bootstrap_USD_curve(today, deposit=df_deposit, swap=df_swap)
-dividendCurve = ql.FlatForward(today, 0.01, ql.Actual365Fixed())
 
-spot = 70
+spot = get_price('AAPL')
+dividend_rate = get_dividend_rate('AAPL')
+dividendCurve = ql.FlatForward(today, dividend_rate, ql.Actual365Fixed())
 heston_model = HestonModel(yieldCurve, dividendCurve, calendar)
 heston_model.calibrate(df_heston_vol, spot)
 
@@ -111,12 +119,7 @@ print(f'equity_fixings: \n{equity_fixings}')
 
 
 
-notional = 1_000_000
-bermudian_knock_out = 1.1
-strike = 1.0
-european_knock_in = 0.95
-coupon_rate = 0.1
-fixing_in_advance = True
+
 
 
 # libor cash flow under deterministic yield curve.

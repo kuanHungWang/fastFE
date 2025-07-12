@@ -29,7 +29,7 @@ from util import get_nearest_fixing_date, year_fraction, combine_schedule
 from leastSquareError import LongstaffSchwartz
 from models import HullWhiteModel, BlackScholesMertonModel, MultiAssetModel
 
-from market_data import (get_deposit, get_swap, get_swaption, get_FRA, get_sofr_future, get_volatility_surface)
+from market_data import (get_deposit, get_swap, get_swaption, get_FRA, get_sofr_future, get_volatility_surface, get_price, get_dividend_rate)
 
 # Description:
 # keywords: equity linked, multi stock, basket, auto call, bermudian knock-out, european knock-in, final sell put, equity swap.
@@ -46,6 +46,7 @@ from market_data import (get_deposit, get_swap, get_swaption, get_FRA, get_sofr_
 # final sell put:
 # if auto call has not occur by the final payment date and last underlying is lower than european knock-in, pay max(strike - underlying, 0)
 
+# contract parameters
 notional = 1_000_000
 bermudian_knock_out = 1.1
 strike = 1.0
@@ -79,14 +80,16 @@ df_deposit = get_deposit(['1M', '2M', '3M', '6M', '9M'])
 df_swap = get_swap(['1Y', '2Y', '5Y', '7Y', '10Y', '15Y', '20Y', '25Y', '30Y'])
 riskFreeCurve = bootstrap_USD_curve(today, deposit=df_deposit, swap=df_swap)
 
-spot_AAPL = 250
-dividendCurve_AAPL = ql.FlatForward(today, 0.02, dayCount)  # Usually don't use flat curve in real world, just simplify for example.
+spot_AAPL = get_price('AAPL')
+dividend_rate_AAPL = get_dividend_rate('AAPL')
+dividendCurve_AAPL = ql.FlatForward(today, dividend_rate_AAPL, dayCount)  # Usually don't use flat curve in real world, just simplify for example.
 df_vol_surface_AAPL = get_volatility_surface('AAPL', ['1M', '2M', '3M', '6M', '9M'], [250, 275, 300, 325, 350])
 vol_surface_AAPL = create_black_vol_surface(df_vol_surface_AAPL, today)
 black_model_vol_surface_AAPL = BlackScholesMertonModel(riskFreeCurve, dividendCurve_AAPL, vol_surface_AAPL, spot_AAPL)
 
-spot_MSFT = 100
-dividendCurve_MSFT = ql.FlatForward(today, 0.01, dayCount)  # Usually don't use flat curve in real world, just simplify for example.
+spot_MSFT = get_price('MSFT')
+dividend_rate_MSFT = get_dividend_rate('MSFT')
+dividendCurve_MSFT = ql.FlatForward(today, dividend_rate_MSFT, dayCount)  # Usually don't use flat curve in real world, just simplify for example.
 df_vol_surface_MSFT = get_volatility_surface('MSFT', ['1M', '2M', '3M', '6M', '9M'], [100, 110, 120, 130, 140])
 vol_surface_MSFT = create_black_vol_surface(df_vol_surface_MSFT, today)
 black_model_vol_surface_MSFT = BlackScholesMertonModel(riskFreeCurve, dividendCurve_MSFT, vol_surface_MSFT, spot_MSFT)
