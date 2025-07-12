@@ -39,18 +39,18 @@ european_knock_in = 0.95
 coupon_rate = 0.1
 fixing_in_advance = True
 
-# equity swap
+
+# Description:
+# keywords: equity linked, single stock, auto call, bermudian knock-out, european knock-in, final sell put, equity swap.
 # tenor: 3Y, frequency 3M
 # receive fixed coupon: 10% annualy, 30/360
 # pay 3M libor, act/360.  fixing-in-advance, 2 days before payment date
 # bermudian knock-out: 110% of initial stock price
 # european knock-in: 95% of initial stock price
 # stike: 100% of initial stock price
-
 # auto call: for each payment date, if the stock price is higher than the strike, the whole contract will be terminated and no more further cashflow after that payment date.
 # final sell put:
-# if auto call has not occur by the final payment date and last stock price is lower than european knock-in
-# pay max(S_T - strike, 0)
+# if auto call has not occur by the final payment date and last stock price is lower than european knock-in, pay max(strike - S_T, 0)
 
 
 # conventions
@@ -160,7 +160,7 @@ still_alive = np.ones((1, equity_fixings.shape[1]), dtype=bool)
 for d in paymentSchedule:
     survival.loc[d] = still_alive
     fixing_day = get_nearest_fixing_date(d, fixingSchedule)
-    still_alive = np.bitwise_and(still_alive, equity_fixings.loc[fixing_day] < bermudian_knock_out * spot)
+    still_alive = np.bitwise_and(still_alive, equity_fixings.loc[fixing_day] < bermudian_knock_out * spot) # trigger at next period, so update still_alive at next period
 print(f'survival: \n{survival}')
 
 total_cashflows = swap_cashflow.values - df_eki_option_payoff

@@ -31,6 +31,29 @@ from models import HullWhiteModel, BlackScholesMertonModel, MultiAssetModel
 
 from market_data import (get_deposit, get_swap, get_swaption, get_FRA, get_sofr_future, get_volatility_surface)
 
+# Description:
+# keywords: equity linked, multi stock, basket, auto call, bermudian knock-out, european knock-in, final sell put, equity swap.
+# linked stocks: AAPL, MSFT
+# underlying: lowest performance of underlyings
+# Calculation of performance: S_t / S_0 (price divided by initial price)
+# tenor: 3Y, frequency 3M
+# receive fixed coupon: 10% annualy, 30/360
+# pay 3M libor, act/360.  fixing-in-advance, 2 days before payment date
+# bermudian knock-out: 110% 
+# european knock-in: 95% 
+# stike: 100% 
+# auto call: for each payment date, if the underlying is higher than the strike, the whole contract will be terminated and no more further cashflow after that payment date.
+# final sell put:
+# if auto call has not occur by the final payment date and last underlying is lower than european knock-in, pay max(strike - underlying, 0)
+
+notional = 1_000_000
+bermudian_knock_out = 1.1
+strike = 1.0
+european_knock_in = 0.95
+coupon_rate = 0.1
+fixing_in_advance = True
+ternor = 3
+
 # conventions
 calendar = ql.UnitedStates(ql.UnitedStates.NYSE)
 date_rolling_convention = ql.ModifiedFollowing
@@ -76,7 +99,7 @@ multiAssetModel = MultiAssetModel(processes, corrMatrix)
 
 
 # schedule for IRS, fixed leg and floating leg, and combined schedule. and fixing schedule(2 days before payment date)
-terminationDate = calendar.advance(settlementDate, ql.Period(3, ql.Years))
+terminationDate = calendar.advance(settlementDate, ql.Period(ternor, ql.Years))
 endOfMonth = calendar.isEndOfMonth(terminationDate)
 paySchedule = ql.Schedule(settlementDate, terminationDate, frequency, calendar, date_rolling_convention, date_termination_convention, rule, endOfMonth)
 recSchedule = ql.Schedule(settlementDate, terminationDate, frequency, calendar, date_rolling_convention, date_termination_convention, rule, endOfMonth)
@@ -98,12 +121,7 @@ lower_return = pd.DataFrame(
 print(f'lowest :\n {lower_return}')
 # generate monte carlo paths
 
-notional = 1_000_000
-bermudian_knock_out = 1.1
-strike = 1.0
-european_knock_in = 0.95
-coupon_rate = 0.1
-fixing_in_advance = True
+
 
 
 # convert to list

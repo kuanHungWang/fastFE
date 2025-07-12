@@ -34,16 +34,17 @@ from market_data import (
     get_FRA, get_sofr_future, get_volatility_surface)
 
 # Description:
-# Keywords: fx linked, single currency, daily range accrual, swap.
+# Keywords: fx linked, target redemption, TRF, forward, multi-period.
 # tenor: 1Y
-# notional: 1M 
-# pay 3M Euribor coupon, act360, fixing in advance
+# notional: EUR 1,000,000
+# frequency: monthly
+# buy EUR against USD at strike, cash settlement
+# terminate when accumated profit reach target
+# accumulated profit = sum of (EUR fixing - strike) , uncapped
 
-# receive daily range accrual coupon, 30/360
-# coupon rate: 2%
-# range: 0.99< EURUSD < 1.2
-# for each payment period, use the fixing value 5 days prior to the payment date for remaining fixing period
-# calculation of range accrual: 
+notional = 1_000_000
+strike = 1.1
+target = 0.2
 
 
 US_calendar = ql.UnitedStates(ql.UnitedStates.NYSE)
@@ -74,7 +75,7 @@ vol_surface = create_black_vol_surface(eurusd_vol, today)
 spot = 1.1
 fx_model = GarmanKohlagenProcessModel(usd_yieldCurve, eur_yieldCurve, vol_surface, spot)
 
-frequency=ql.Period('3M')
+frequency=ql.Period('1M')
 terminationDate = calendar.advance(settlementDate, ql.Period('1Y'))
 endOfMonth = calendar.isEndOfMonth(terminationDate)
 
@@ -85,64 +86,43 @@ endOfMonth= calendar.isEndOfMonth(terminationDate)
 paymentSchedule = ql.Schedule(settlementDate, terminationDate, frequency, calendar, date_rolling_convention, date_termination_convention, rule, endOfMonth)
 
 paymentSchedule = [d for d in paymentSchedule]
+fixingSchedule = [calendar.advance(d, ql.Period('-2d')) for d in paymentSchedule]
 
-
-
-notional = 1_000_000
-coupon_rate = 0.02
-upper_bound = 1.2
-lower_bound = 0.99
-fixing_in_advance = True
-n_period_end_replacement = 5
-
-# libor cash flow under deterministic yield curve.
-ts = ql.YieldTermStructureHandle(eur_yieldCurve)
-libor_dayCount = ql.Actual360()
-libor_index = ql.Euribor3M(ts)
-libor_fixings = pd.DataFrame([libor_index.fixing(d) for d in paymentSchedule], index=paymentSchedule)
-discountFactors = pd.DataFrame([eur_yieldCurve.discount(d) for d in paymentSchedule], index=paymentSchedule)
-print(f'discountFactors: \n{discountFactors}')
-print(f'libor_fixings: \n{libor_fixings}')
-if fixing_in_advance:
-    libor_fixings = libor_fixings.shift(1)
-libor_year_fraction = pd.DataFrame(year_fraction(paymentSchedule, libor_dayCount, accoumulative=False), index=paymentSchedule)
-libor_cashflows = notional * libor_fixings * libor_year_fraction
-print(f'libor_cashflows: \n{libor_cashflows}')
+print(f'paymentSchedule: ({len(paymentSchedule)} periods)\n{paymentSchedule}')
+print(f'fixingSchedule: ({len(fixingSchedule)} fixing days)\n{fixingSchedule}')
 
 daily_fixing_days = ql.MakeSchedule(settlementDate, terminationDate, ql.Period('1d'), calendar=calendar)
 print(len(daily_fixing_days))
 
 n_paths = 2**2
-fx_fixing = fx_model.monte_carlo_paths(daily_fixing_days, numPaths=n_paths)
+fx_fixing = fx_model.monte_carlo_paths(fixingSchedule, numPaths=n_paths)
+
+print(f'\nfx_fixing: \n{fx_fixing}')
 
 
-range_accrual_yearFraction = year_fraction(paymentSchedule, ql.Actual360(), accoumulative=False)
-range_accrual_yearFraction = pd.DataFrame(range_accrual_yearFraction, index=paymentSchedule)
-start_date = paymentSchedule[0]
+cashflows = pd.DataFrame((fx_fixing.values - strike)/fx_fixing.values*notional, index=paymentSchedule)
+
+print(f'cashflows: \n{cashflows}')
+
+accumulated = 0
+# survival probability
+survival = pd.DataFrame(np.zeros_like(cashflows, dtype=bool), index=paymentSchedule)
+still_alive = np.ones((1, cashflows.shape[1]), dtype=bool)
+for d in paymentSchedule:
+    survival.loc[d] = still_alive
+    fixing_day = get_nearest_fixing_date(d, fixingSchedule)
+    S_t = fx_fixing.loc[fixing_day]
+    accumulated += np.maximum(S_t - strike, 0)
+    still_alive = np.bitwise_and(still_alive, accumulated < target)  # trigger at next period, so update still_alive at next period
+print(f'survival: \n{survival}')
 
 
 
-range_accrual_cashflows = pd.DataFrame(np.zeros((len(paymentSchedule), n_paths), dtype=float), index=paymentSchedule)
-for d in paymentSchedule[1:]:
-    end_dade = d
-    # For each payment period, calculate range accrual coupon
-    period_fixing = fx_fixing.loc[start_date:end_dade]
-    # Handle the last 5 days: use fixing 5 days prior to payment date
-    if len(period_fixing) > n_period_end_replacement:
-
-        period_fixing.iloc[-n_period_end_replacement:] = period_fixing.iloc[-n_period_end_replacement]  # use fixing 5 days prior for last 5 days
-
-    # Count in-range days
-
-    in_range = (period_fixing > lower_bound) & (period_fixing < upper_bound)
-    accrual_fraction = in_range.mean(axis=0).values
-    accrual_amount = notional * coupon_rate * accrual_fraction * range_accrual_yearFraction.loc[end_dade].values
-    range_accrual_cashflows.loc[end_dade] = accrual_amount
-    print(f'Period {start_date} to {end_dade}: In-range days=\n{in_range.sum(axis=0)}, Total days=\n{len(period_fixing)}, Accrual fraction=\n{accrual_fraction}')
-    start_date = d
-print(f'range_accrual_cashflows: \n{range_accrual_cashflows}')
-
-present_value = range_accrual_cashflows * discountFactors.values
+discountFactors = pd.DataFrame([eur_yieldCurve.discount(d) for d in paymentSchedule], index=paymentSchedule)
+print(f'discountFactors: \n{discountFactors}')
+cashflow_survival = cashflows * survival
+print(f'cashflow_survival: \n{cashflow_survival}')
+present_value = cashflow_survival * discountFactors.values
 print(f'present_value(all paths): \n{present_value}')
 print(f'expected present value: {present_value.mean(axis=1)}')
 npv = present_value.sum(axis=0)

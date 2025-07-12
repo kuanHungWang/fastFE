@@ -27,6 +27,7 @@ from models import HullWhiteModel
 from market_data import (get_deposit, get_swap, get_swaption, get_FRA, get_sofr_future)
 
 # Description:
+# keywords: cancellable, Bermudan exercise, interest rate swap, IRS, libor floating leg, fixing-in-advance
 # fixed rate cancellable IRS (Libor)
 # rec fixed leg, 30/360, frequency 6M
 # pay floating: index: 6M libor, act/360, frequency 6M

@@ -27,6 +27,7 @@ from models import HullWhiteModel
 from market_data import (get_deposit, get_swap, get_swaption, get_FRA, get_sofr_future)
 
 # Description:
+# Keywords: IRS, interest rate swap, sofr floating leg, daily conmpound SOFR, cancellable, Bermudan exercise 
 # fixed rate cancellable IRS(daily compound SOFR)
 # rec fixed leg, 30/360, frequency 6M
 # pay floating: index: 6M libor, act/360, frequency 6M

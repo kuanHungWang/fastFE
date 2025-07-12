@@ -25,7 +25,8 @@ from vol_helper import (
 from leastSquareError import LongstaffSchwartz
 from models import HullWhiteModel
 
-# term structure:
+# Description:
+# keywords: range accrual, interest rate linked, cms, constant maturity swap, fixed leg, libor floating leg, fixing-in-advance, cancellable, Bermudan exercise 
 # tenor 3Y
 # pay 6m libor, act/360, fixing-in-advance
 # rec 2y cms range accrual, 30/360, frequency 6M
@@ -194,3 +195,6 @@ lse = LongstaffSchwartz(
     observable=observations
 )
 lse.backward_induction()
+print(f'\nconfidence interval: {lse.confidence_interval()}')
+print(f'\nsurvival probability: {lse.survival_probability()}')
+print(f'\nexercise cashflows: \n{lse.exercise_cashflows()}')
