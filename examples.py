@@ -369,13 +369,10 @@ libor_cashflows = notional * libor_fixings * libor_year_fraction
 
 #***
 # calculate floating cashflow with libor index in stochastic interest rate with multiple simulation paths of fixing.
-
 # fixings = ...  # get fixing_value from model or other sources.
-
 # step 1. get fixing rate of floating index, here are three ways of doing it, all have same result.
 # method 1: The easiest way, use fixings as it is.
 fixing_value = fixings.shift(1) if fixing_in_advance else fixings
-
 # method 2: If fixings is not just generated for this leg. For example, floating leg freqency is 6m, but fixing is generated in freqency of 3M for other purposes.
 fixingSchedule = [calendar.advance(d,ql.Period(-2, ql.Days)) for d in paySchedule]  
 # method 3: A more robustic versio of 1.2, especially for fixing is not in daily basis, but if fixing is available for every business day, this may not get you truely 2 business days before payment date.
@@ -387,4 +384,25 @@ year_fraction_pay = np.array(year_fraction(paySchedule, dayCount, accoumulative=
 floating_cashflows = notional * fixing_value.values * year_fraction_pay  # step 3. calculate floating cashflows
 floating_cashflows = pd.DataFrame(floating_cashflows, index=paySchedule)  # step 4. convert to dataframe, use paySchedule as index to align with other cashflows.
 
+
+#***
+# calculate sofr compounded cashflows
+
+floating_cashflows = []
+for i in range(1, len(paySchedule)):
+    period_start = paySchedule[i-1]
+    period_end = paySchedule[i]
+    # Get all daily dates in the accrual period
+    daily_dates = [d for d in fixings.index if period_start < d <= period_end]
+    # Get daily SOFR rates for all paths
+    daily_rates = fixings.loc[daily_dates].values  # shape: (num_days, num_paths)
+    # Get year fractions for each day (using Actual/360 convention)
+    delta_t = np.array([dayCount.yearFraction(daily_dates[j-1], daily_dates[j]) if j > 0 else dayCount.yearFraction(period_start, daily_dates[j]) for j in range(len(daily_dates))])
+    # For each path, compute compounded rate
+    compounded = np.prod(1 + daily_rates * delta_t[:, np.newaxis], axis=0) - 1
+    # Compute cashflow for each path
+    cf = notional * compounded
+    floating_cashflows.append(cf)
+floating_cashflows = np.vstack(floating_cashflows)
+floating_cashflows = pd.DataFrame(floating_cashflows, index=paySchedule[1:])
 

@@ -26,9 +26,8 @@ from leastSquareError import LongstaffSchwartz
 from models import HullWhiteModel
 from market_data import (get_deposit, get_swap, get_swaption, get_FRA, get_sofr_future)
 
-# fixed rate cancellable IRS
-
-
+# Description:
+# fixed rate cancellable IRS (Libor)
 # rec fixed leg, 30/360, frequency 6M
 # pay floating: index: 6M libor, act/360, frequency 6M
 # cancelable schedule: same as fixed leg frequency
@@ -38,16 +37,14 @@ from market_data import (get_deposit, get_swap, get_swaption, get_FRA, get_sofr_
 
 
 # conventions
-fixed_leg_conventions = Conventions.USFixedLegConventions()
-floating_leg_conventions = Conventions.USFloatingLegConventions()
-calendar = fixed_leg_conventions['calendar']
-date_rolling_convention = fixed_leg_conventions['date_rolling_convention']
-date_termination_convention = fixed_leg_conventions['date_termination_convention']
+calendar = ql.UnitedStates(ql.UnitedStates.Settlement)
+date_rolling_convention = ql.ModifiedFollowing
+date_termination_convention = ql.ModifiedFollowing
 frequency = ql.Period('6M')
-dayCount = fixed_leg_conventions['dayCounter']
-currency = fixed_leg_conventions['currency']
-endOfMonth = fixed_leg_conventions['endOfMonth']
-rule = fixed_leg_conventions['rule']
+dayCount = ql.Thirty360(ql.Thirty360.USA)
+currency = ql.USDCurrency()
+rule = ql.DateGeneration.Forward
+
 
 # set evaluation date
 today = ql.Date().todaysDate()
@@ -73,6 +70,7 @@ hw_model.calibrate(df_swaption)
 
 # schedule for IRS, fixed leg and floating leg, and combined schedule. and fixing schedule(2 days before payment date)
 terminationDate = calendar.advance(settlementDate, ql.Period(3, ql.Years))
+endOfMonth = calendar.isEndOfMonth(terminationDate)
 paySchedule = ql.Schedule(settlementDate, terminationDate, frequency, calendar, date_rolling_convention, date_termination_convention, rule, endOfMonth)
 recSchedule = ql.Schedule(settlementDate, terminationDate, frequency, calendar, date_rolling_convention, date_termination_convention, rule, endOfMonth)
 paymentSchedule = combine_schedule(paySchedule, recSchedule)  # merge two schedules

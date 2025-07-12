@@ -1,7 +1,7 @@
 import QuantLib as ql
 import numpy as np
 import pandas as pd
-from util import leg_to_series, subset_to_bool
+from util import leg_to_series, subset_to_bool, get_nearest_fixing_date
 from datetime import datetime
 from rate_helpers import (
     create_USD_deposit_rate_helpers,
@@ -11,8 +11,7 @@ from rate_helpers import (
     create_OIS_helper,
     create_fra_rate_helpers,  # <-- corrected
     create_bond_helper,
-    create_sofr_future_rate_helpers
-)
+    create_sofr_future_rate_helpers)
 from curve_builder import bootstrap_USD_curve, bootstrap_EUR_curve, bootstrap_JPY_curve, bootstrap_GBP_curve, bootstrap_TWD_curve
 from conventions import Conventions
 from typing import Literal, Tuple
@@ -20,29 +19,33 @@ from curve_builder import bootstrap_curve_with_instrument_helpers, bootstrap_cur
 from vol_helper import (
     create_USD_swaption_helpers, create_EUR_swaption_helpers,
     create_JPY_swaption_helpers, create_GBP_swaption_helpers,
-    create_CHF_swaption_helpers, create_TWD_swaption_helpers
-)
-
+    create_CHF_swaption_helpers, create_TWD_swaption_helpers)
 from curve_builder import bootstrap_USD_curve
 from util import get_nearest_fixing_date, year_fraction, combine_schedule
 from leastSquareError import LongstaffSchwartz
 from models import HullWhiteModel
-
 from market_data import (get_deposit, get_swap, get_swaption, get_FRA, get_sofr_future)
 
+# Description:
+# fixed rate cancellable IRS(daily compound SOFR)
+# rec fixed leg, 30/360, frequency 6M
+# pay floating: index: 6M libor, act/360, frequency 6M
+# cancelable schedule: same as fixed leg frequency
+# floating leg fixing schedule: 2 days before payment date, fixing-in-advance
+# tenor: 3Y
+# fixing rate: 1.8%, notional: 1M USD
+
+
 # conventions
-fixed_leg_conventions = Conventions.USFixedLegConventions()
-floating_leg_conventions = Conventions.USFloatingLegConventions()
-calendar = fixed_leg_conventions['calendar']
-date_rolling_convention = fixed_leg_conventions['date_rolling_convention']
-date_termination_convention = fixed_leg_conventions['date_termination_convention']
-frequency = floating_leg_conventions['frequency']
-dayCount = fixed_leg_conventions['dayCounter']
-currency = fixed_leg_conventions['currency']
-endOfMonth = fixed_leg_conventions['endOfMonth']
-rule = fixed_leg_conventions['rule']
+calendar = ql.UnitedStates(ql.UnitedStates.Settlement)
+date_rolling_convention = ql.ModifiedFollowing
+date_termination_convention = ql.ModifiedFollowing
+frequency = ql.Period('6M')
+dayCount = ql.Thirty360(ql.Thirty360.USA)
+currency = ql.USDCurrency()
+rule = ql.DateGeneration.Forward
 
-
+# set evaluation date
 today = ql.Date().todaysDate()
 today = calendar.advance(today,ql.Period(0, ql.Days))  # ensure today is a business day (In case of using in non-trading day)
 settlementDate = calendar.advance(today,ql.Period(2, ql.Days))
@@ -66,22 +69,22 @@ hw_model.calibrate(df_swaption)
 
 # schedule for IRS, fixed leg and floating leg, and combined schedule. and fixing schedule(2 days before payment date)
 terminationDate = calendar.advance(settlementDate, ql.Period(3, ql.Years))
+endOfMonth = calendar.isEndOfMonth(terminationDate)
+
 paySchedule = ql.Schedule(settlementDate, terminationDate, frequency, calendar, date_rolling_convention, date_termination_convention, rule, endOfMonth)
 recSchedule = ql.Schedule(settlementDate, terminationDate, frequency, calendar, date_rolling_convention, date_termination_convention, rule, endOfMonth)
 paymentSchedule = combine_schedule(paySchedule, recSchedule)  # merge two schedules
-fixingSchedule = [calendar.advance(d,ql.Period(-2, ql.Days)) for d in paymentSchedule]  # fixing schedule(2 business days before payment date)
+fixingSchedule = ql.Schedule(settlementDate, terminationDate, ql.Period('1D'), calendar, date_rolling_convention, date_termination_convention, rule, endOfMonth)  # for sofr daily compounding, we need daily fixing schedule
 
 # generate monte carlo paths
 
 # create ibor index factory as input of monte carlo paths generators.
 def create_sofr_index(ts):
     # Use QuantLib's SOFR index as the floating leg
-    return ql.OvernightIndex('SOFR', 1, currency, calendar, dayCount, ts)
-
+    return ql.OvernightIndex('SOFR', 1, currency, calendar, ql.Actual360(), ts)
 
 n_path = 6
 underlying_path, fixings, discountFactors = hw_model.monte_carlo_paths([create_sofr_index], fixingSchedule, paymentSchedule, n_path)
-
 # notes: 
 # 1. the resulting underlying_path, fixings, discountFactors are dataframes with index of ql.Date.
 # 2. fixings is a list of dataframes, each dataframe is the fixing of ibor index.
@@ -94,16 +97,18 @@ print(f'fixings: \n{fixings}')
 # cashflow according to monte carlo paths.
 fixed_rate = 0.018
 notional = 1_000_000
-
+fixing_in_advance = True
 # convert to list
 paySchedule = [d for d in paySchedule]
 recSchedule = [d for d in recSchedule]
+
 
 # fixed cashflows
 year_fraction_rec = np.array(year_fraction(recSchedule, dayCount, accoumulative=False))
 fixed_cashflows = pd.DataFrame(notional * fixed_rate * year_fraction_rec, index=recSchedule)
 print(f'\nfixed_cashflows: \n{fixed_cashflows}')
 
+#************************
 
 # floating cashflows (SOFR daily compounding)
 floating_cashflows = []
@@ -127,12 +132,12 @@ for i in range(1, len(paySchedule)):
     floating_cashflows.append(cf)
 floating_cashflows = np.vstack(floating_cashflows)
 floating_cashflows = pd.DataFrame(floating_cashflows, index=paySchedule[1:])
-
+#************************
 
 # ensure same index for case that two leg has different payment schedule
 fixed_cashflows = fixed_cashflows.reindex(paymentSchedule) 
+print(f'floating_cashflows: \n{floating_cashflows}')
 floating_cashflows = floating_cashflows.reindex(paymentSchedule)
-print(f'\nfloating_cashflows: \n{floating_cashflows}')
 net_cashflows = fixed_cashflows.values - floating_cashflows  
 print(f'\nnet cashflows: \n{net_cashflows}')
 

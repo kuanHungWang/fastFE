@@ -54,8 +54,7 @@ fixing_in_advance = True
 
 
 # conventions
-fixed_leg_conventions = Conventions.USFixedLegConventions()
-floating_leg_conventions = Conventions.USFloatingLegConventions()
+
 US_calendar = ql.UnitedStates(ql.UnitedStates.NYSE)
 EUR_calendar = ql.TARGET()
 calendar = ql.JointCalendar(US_calendar, EUR_calendar)
@@ -65,7 +64,6 @@ frequency = ql.Period('3M')
 coupon_dayCount = ql.Thirty360(ql.Thirty360.USA)
 libor_dayCount = ql.Actual360()
 currency = ql.USDCurrency()
-endOfMonth = False
 rule = ql.DateGeneration.Forward
 
 
@@ -97,6 +95,8 @@ heston_model.calibrate(df_heston_vol, spot)
 
 
 terminationDate = calendar.advance(settlementDate, ql.Period(3, ql.Years))
+endOfMonth = calendar.isEndOfMonth(terminationDate)
+
 paymentSchedule = ql.Schedule(settlementDate, terminationDate, frequency, calendar, date_rolling_convention, date_termination_convention, rule, endOfMonth)
 fixingSchedule = [calendar.advance(d,ql.Period(-2, ql.Days)) for d in paymentSchedule]  # fixing schedule(2 business days before payment date)
 
@@ -111,8 +111,6 @@ print(f'equity_fixings: \n{equity_fixings}')
 
 
 
-
-
 notional = 1_000_000
 bermudian_knock_out = 1.1
 strike = 1.0
@@ -120,6 +118,8 @@ european_knock_in = 0.95
 coupon_rate = 0.1
 fixing_in_advance = True
 
+
+# libor cash flow under deterministic yield curve.
 discountFactors = [yieldCurve.discount(d) for d in paymentSchedule]
 discountFactors = pd.DataFrame(discountFactors, index=paymentSchedule)
 print(f'discountFactors: \n{discountFactors}')
@@ -131,11 +131,18 @@ if fixing_in_advance:
 libor_year_fraction = np.array(year_fraction(paymentSchedule, libor_dayCount, accoumulative=False))[:, np.newaxis]
 libor_cashflows = notional * libor_fixings * libor_year_fraction
 print(f'libor_cashflows: \n{libor_cashflows}')
+
+
+# fixed coupon cashflow before auto call
 coupon_year_fraction = np.array(year_fraction(paymentSchedule, coupon_dayCount, accoumulative=False))[:, np.newaxis]
 coupon_cashflow = notional * coupon_rate * coupon_year_fraction
 coupon_cashflow = pd.DataFrame(coupon_cashflow, index=paymentSchedule)
 print(f'coupon_cashflow: \n{coupon_cashflow}')
 
+swap_cashflow = coupon_cashflow - libor_cashflows
+print(f'swap_cashflow: \n{swap_cashflow}')
+
+# vanilla option payoff regardless of knock-in
 S_T = equity_fixings.iloc[-1]
 knockin = S_T < european_knock_in * spot
 print(f'knockin: \n{knockin}')
@@ -147,15 +154,25 @@ df_eki_option_payoff = pd.DataFrame(np.zeros_like(equity_fixings, dtype=float), 
 df_eki_option_payoff.iloc[-1] = eki_option_payoff
 print(f'df_eki_option_payoff: \n{df_eki_option_payoff}')
 
+# survival probability
 survival = pd.DataFrame(np.zeros_like(equity_fixings, dtype=bool), index=paymentSchedule)
 still_alive = np.ones((1, equity_fixings.shape[1]), dtype=bool)
 for d in paymentSchedule:
     survival.loc[d] = still_alive
     fixing_day = get_nearest_fixing_date(d, fixingSchedule)
     still_alive = np.bitwise_and(still_alive, equity_fixings.loc[fixing_day] < bermudian_knock_out * spot)
-
 print(f'survival: \n{survival}')
-cashflows = coupon_cashflow.values - libor_cashflows.values - df_eki_option_payoff
-print(f'cashflows: \n{cashflows}')
-cashflow_survival = cashflows * survival
+
+total_cashflows = swap_cashflow.values - df_eki_option_payoff
+print(f'total_cashflows: \n{total_cashflows}')
+cashflow_survival = total_cashflows * survival
 print(f'cashflow_survival: \n{cashflow_survival}')
+present_value = cashflow_survival * discountFactors.values
+print(f'present_value: \n{present_value}')
+npv = np.sum(present_value, axis=0)
+print(f'npv: \n{npv}')
+valuation = npv.mean()
+print(f'valuation: {valuation}')
+std = npv.std()
+confidence_interval = (valuation - 1.96 * std / np.sqrt(npv.shape[0]), valuation + 1.96 * std / np.sqrt(npv.shape[0]))
+print(f'confidence interval: {confidence_interval}')

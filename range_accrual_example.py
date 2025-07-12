@@ -25,24 +25,30 @@ from vol_helper import (
 from leastSquareError import LongstaffSchwartz
 from models import HullWhiteModel
 
+# term structure:
+# tenor 3Y
+# pay 6m libor, act/360, fixing-in-advance
+# rec 2y cms range accrual, 30/360, frequency 6M
+# upper bound 2.5%, lower bound 0.1%, rate 3%
+# notional 1M USD
+# cancelable schedule: same as fixed leg frequency
+
 
 # conventions
-fixed_leg_conventions = Conventions.USFixedLegConventions()
-floating_leg_conventions = Conventions.USFloatingLegConventions()
-calendar = fixed_leg_conventions['calendar']
-date_rolling_convention = fixed_leg_conventions['date_rolling_convention']
-date_termination_convention = fixed_leg_conventions['date_termination_convention']
-frequency = floating_leg_conventions['frequency']
-dayCount = fixed_leg_conventions['dayCounter']
-currency = fixed_leg_conventions['currency']
-endOfMonth = fixed_leg_conventions['endOfMonth']
-rule = fixed_leg_conventions['rule']
+calendar = ql.UnitedStates(ql.UnitedStates.Settlement)
+date_rolling_convention = ql.ModifiedFollowing
+date_termination_convention = ql.ModifiedFollowing
+frequency = ql.Period('6M')
+dayCount = ql.Thirty360(ql.Thirty360.USA)
+currency = ql.USDCurrency()
+rule = ql.DateGeneration.Forward
 
 calendar = ql.JointCalendar(ql.TARGET(), calendar) # add Target as we use Euribor swap fixing.
 
 today = ql.Date().todaysDate()
 # today = ql.Date(14, 6, 2025)
 today = calendar.advance(today,ql.Period(0, ql.Days))
+
 settlementDate = calendar.advance(today,ql.Period(2, ql.Days))
 ql.Settings.instance().evaluationDate = today
 print(f' trade date: {today}')
@@ -76,6 +82,7 @@ hw_model.calibrate(df_swaption)
 
 # schedule
 terminationDate = calendar.advance(settlementDate, ql.Period(3, ql.Years))
+endOfMonth = calendar.isEndOfMonth(terminationDate)
 paySchedule = ql.Schedule(settlementDate, terminationDate, frequency, calendar, date_rolling_convention, date_termination_convention, rule, endOfMonth)
 recSchedule = ql.Schedule(settlementDate, terminationDate, frequency, calendar, date_rolling_convention, date_termination_convention, rule, endOfMonth)
 paymentSchedule = combine_schedule(paySchedule, recSchedule)
@@ -105,12 +112,15 @@ print(f'notional: {notional}')
 paySchedule = [d for d in paySchedule]
 recSchedule = [d for d in recSchedule]
 
-
+print(f'paySchedule: \n{paySchedule}')
+print(f'recSchedule: \n{recSchedule}')
 
 year_fraction_rec = np.array(year_fraction(recSchedule, dayCount, accoumulative=False))
 fixed_cashflows = pd.DataFrame(notional * fixed_rate * year_fraction_rec, index=recSchedule)
 print(f'\nfixed_cashflows: \n{fixed_cashflows}')
-print(f'\nfixings: \n{fixings}')
+
+
+
 
 # range acrual cashflows
 start_date = paySchedule[0]

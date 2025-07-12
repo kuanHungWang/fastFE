@@ -1,81 +1,76 @@
 import QuantLib as ql
 import numpy as np
 import pandas as pd
-from util import year_fraction
-sigma = 0.2
+from util import leg_to_series, subset_to_bool, get_nearest_fixing_date
+from datetime import datetime
+from rate_helpers import (
+    create_USD_deposit_rate_helpers,
+    create_USD_swap_rate_helpers,
+    create_deposit_rate_helpers,
+    create_swap_rate_helpers,
+    create_OIS_helper,
+    create_fra_rate_helpers,  # <-- corrected
+    create_bond_helper,
+    create_sofr_future_rate_helpers)
+from curve_builder import bootstrap_USD_curve, bootstrap_EUR_curve, bootstrap_JPY_curve, bootstrap_GBP_curve, bootstrap_TWD_curve
+from conventions import Conventions
+from typing import Literal, Tuple
+from curve_builder import bootstrap_curve_with_instrument_helpers, bootstrap_curve
+from vol_helper import (
+    create_USD_swaption_helpers, create_EUR_swaption_helpers,
+    create_JPY_swaption_helpers, create_GBP_swaption_helpers,
+    create_CHF_swaption_helpers, create_TWD_swaption_helpers)
+from curve_builder import bootstrap_USD_curve
+from util import get_nearest_fixing_date, year_fraction, combine_schedule
+from leastSquareError import LongstaffSchwartz
+from models import HullWhiteModel
+from market_data import (get_deposit, get_swap, get_swaption, get_FRA, get_sofr_future)
+
+# Description:
+# fixed rate cancellable IRS (Libor)
+# rec fixed leg, 30/360, frequency 6M
+# pay floating: index: 6M libor, act/360, frequency 6M
+# cancelable schedule: same as fixed leg frequency
+# floating leg fixing schedule: 2 days before payment date, fixing-in-advance
+# tenor: 3Y
+# fixing rate: 1.8%, notional: 1M USD
+
+
+# conventions
+calendar = ql.UnitedStates(ql.UnitedStates.Settlement)
+date_rolling_convention = ql.ModifiedFollowing
+date_termination_convention = ql.ModifiedFollowing
+frequency = ql.Period('6M')
+dayCount = ql.Thirty360(ql.Thirty360.USA)
+currency = ql.USDCurrency()
+rule = ql.DateGeneration.Backward
+y=3
+
+print(f' calendar: {calendar}')
+# set evaluation date
 today = ql.Date().todaysDate()
-initialValue = ql.QuoteHandle(ql.SimpleQuote(100))
-domesticRiskFreeTS = ql.YieldTermStructureHandle(ql.FlatForward(today, 0.03, ql.Actual365Fixed()))
-foreignRiskFreeTS = ql.YieldTermStructureHandle(ql.FlatForward(today, 0.01, ql.Actual365Fixed()))
+today = calendar.advance(today,ql.Period(0, ql.Days))  # ensure today is a business day (In case of using in non-trading day)
+settlementDate = calendar.advance(today,ql.Period(2, ql.Days))
+ql.Settings.instance().evaluationDate = today
+print(f' trade date: {today}')
+print(f' settlement date: {settlementDate}')
+terminationDate = calendar.advance(settlementDate, ql.Period(y, ql.Years))
+endOfMonth = calendar.isEndOfMonth(terminationDate)
+print(f' termination date: {terminationDate}')
+paySchedule = ql.Schedule(settlementDate, terminationDate, frequency, calendar, date_rolling_convention, date_termination_convention, rule, endOfMonth)
+print(f' paySchedule: {[d for d in paySchedule]}')
 
-# 1. Constant Volatility
-volTS = ql.BlackVolTermStructureHandle(ql.BlackConstantVol(today, ql.NullCalendar(), sigma, ql.Actual365Fixed()))
-process = ql.GarmanKohlagenProcess(initialValue, foreignRiskFreeTS, domesticRiskFreeTS, volTS)
-
-# 2. Volatility Curve
-expirations = [today+ql.Period(tenor) for tenor in ['1M', '6M', '9M', '1Y']]
-volatilities = [.145, .156, .165, .175]
-volatilityCurve = ql.BlackVarianceCurve(today, expirations, volatilities, ql.Actual360())
-volatilityCurve.enableExtrapolation()
-volTS = ql.BlackVolTermStructureHandle(volatilityCurve)
-process = ql.GarmanKohlagenProcess(initialValue, foreignRiskFreeTS, domesticRiskFreeTS, volTS)
-
-
-# 3. Volatility Surface (local volatility)
-
-strikes = [50.0, 100.0, 110.0]
-expirations = ['1M', '6M', '9M', '1Y']
-df=pd.DataFrame(index=strikes, columns=expirations)
-df.values.fill(0.2)
-print(df)
-
-volMatrix = ql.Matrix(len(strikes), len(expirations))
-expirations = [today+ql.Period(tenor) for tenor in df.columns]
-for i, strike in enumerate(strikes):
-    for j, expiration in enumerate(expirations):
-        volMatrix[i][j] = df.iloc[i,j]
-volatilitySurface = ql.BlackVarianceSurface(today, ql.WeekendsOnly(), expirations, strikes, volMatrix, ql.Business252())
-volTS = ql.BlackVolTermStructureHandle(volatilitySurface)
-process = ql.GarmanKohlagenProcess(initialValue, foreignRiskFreeTS, domesticRiskFreeTS, volTS)
-
-
-
-# 4. Monte Carlo
-schedule = ql.MakeSchedule(today, today+ql.Period('1Y'), ql.Period('1M'))
-time_grid = year_fraction(schedule, ql.Actual360(), accoumulative=True)
-n_steps = len(schedule) - 1
-dimension = process.factors()
-rng = ql.UniformRandomSequenceGenerator(dimension * n_steps, ql.UniformRandomGenerator())
-sequenceGenerator = ql.GaussianRandomSequenceGenerator(rng)
-pathGenerator = ql.GaussianMultiPathGenerator(process, time_grid, sequenceGenerator, False)
-
-
-samplePath = pathGenerator.next()
-
+calendar = ql.JointCalendar(ql.TARGET(), calendar) # add Target as we use Euribor swap fixing.
+print(f'\ncalendar: {calendar}')
 today = ql.Date().todaysDate()
-calendar = ql.NullCalendar()
-dayCounter = ql.Actual365Fixed()
-spot = 100
-r, q = 0.02, 0.05
+today = calendar.advance(today,ql.Period(0, ql.Days))  # ensure today is a business day (In case of using in non-trading day)
+settlementDate = calendar.advance(today,ql.Period(2, ql.Days))
+ql.Settings.instance().evaluationDate = today
+print(f' trade date: {today}')
+print(f' settlement date: {settlementDate}')
+terminationDate = calendar.advance(settlementDate, ql.Period(y, ql.Years))
+endOfMonth = calendar.isEndOfMonth(terminationDate)
+print(f' termination date: {terminationDate}')
+paySchedule = ql.Schedule(settlementDate, terminationDate, frequency, calendar, date_rolling_convention, date_termination_convention, rule, endOfMonth)
+print(f' paySchedule: {[d for d in paySchedule]}')
 
-spotQuote = ql.QuoteHandle(ql.SimpleQuote(spot))
-ratesTs = ql.YieldTermStructureHandle(ql.FlatForward(today, r, dayCounter))
-dividendTs = ql.YieldTermStructureHandle(ql.FlatForward(today, q, dayCounter))
-
-# Market options price quotes
-optionStrikes = [95, 97.5, 100, 102.5, 105, 90, 95, 100, 105, 110, 80, 90, 100, 110, 120]
-optionMaturities = ["3M", "3M", "3M", "3M", "3M", "6M", "6M", "6M", "6M", "6M", "1Y", "1Y", "1Y", "1Y", "1Y"]
-optionQuotedVols = [0.11, 0.105, 0.1, 0.095, 0.095, 0.12, 0.11, 0.105, 0.1, 0.105, 0.12, 0.115, 0.11, 0.11, 0.115]
-
-calibrationSet = ql.CalibrationSet()
-
-for strike, expiry, impliedVol in zip(optionStrikes, optionMaturities, optionQuotedVols):
-  payoff = ql.PlainVanillaPayoff(ql.Option.Call, strike)
-  exercise = ql.EuropeanExercise(calendar.advance(today, ql.Period(expiry)))
-
-  calibrationSet.push_back((ql.VanillaOption(payoff, exercise), ql.SimpleQuote(impliedVol)))
-
-ahInterpolation = ql.AndreasenHugeVolatilityInterpl(calibrationSet, spotQuote, ratesTs, dividendTs)
-ahLocalSurface = ql.AndreasenHugeLocalVolAdapter(ahInterpolation)
-ts = ql.BlackVolTermStructureHandle(ahLocalSurface)
-print(f'ahLocalSurface: \n{ahLocalSurface}')

@@ -33,6 +33,14 @@ from market_data import (
     get_deposit, get_swap, get_swaption, 
     get_FRA, get_sofr_future, get_volatility_surface)
 
+# termsheet:
+# tenor: 1Y
+# notional: 1M 
+# pay 3M Euribor coupon, act360, fixing in advance
+# receive daily range accrual coupon, 30/360
+# range: 0.99< EURUSD < 1.2
+# for each payment period, use the fixing value 5 days prior to the payment date for remaining fixing period
+# coupon rate: 2%
 
 
 US_calendar = ql.UnitedStates(ql.UnitedStates.NYSE)
@@ -65,25 +73,17 @@ fx_model = GarmanKohlagenProcessModel(usd_yieldCurve, eur_yieldCurve, vol_surfac
 
 frequency=ql.Period('3M')
 terminationDate = calendar.advance(settlementDate, ql.Period('1Y'))
+endOfMonth = calendar.isEndOfMonth(terminationDate)
 
 date_rolling_convention = ql.ModifiedFollowing
 date_termination_convention = ql.ModifiedFollowing
-rule = ql.DateGeneration.Backward
-if calendar.isEndOfMonth(terminationDate):
-    endOfMonth = True
-else:
-    endOfMonth = False
-
+rule = ql.DateGeneration.Forward
+endOfMonth= calendar.isEndOfMonth(terminationDate)
 paymentSchedule = ql.Schedule(settlementDate, terminationDate, frequency, calendar, date_rolling_convention, date_termination_convention, rule, endOfMonth)
 
 paymentSchedule = [d for d in paymentSchedule]
 
-# pay 3M Euribor coupon, act360, fixing in advance
 
-# receive daily range accrual coupon, 30/360
-# range: 0.99< EURUSD < 1.2
-# for each payment period, use the fixing value 5 days prior to the payment date for remaining fixing period
-# coupon rate: 2%
 
 notional = 1_000_000
 coupon_rate = 0.02
@@ -91,6 +91,8 @@ upper_bound = 1.2
 lower_bound = 0.99
 fixing_in_advance = True
 n_period_end_replacement = 5
+
+# libor cash flow under deterministic yield curve.
 ts = ql.YieldTermStructureHandle(eur_yieldCurve)
 libor_dayCount = ql.Actual360()
 libor_index = ql.Euribor3M(ts)
@@ -98,10 +100,7 @@ libor_fixings = pd.DataFrame([libor_index.fixing(d) for d in paymentSchedule], i
 print(f'libor_fixings: \n{libor_fixings}')
 if fixing_in_advance:
     libor_fixings = libor_fixings.shift(1)
-    
-
 libor_year_fraction = pd.DataFrame(year_fraction(paymentSchedule, libor_dayCount, accoumulative=False), index=paymentSchedule)
-
 libor_cashflows = notional * libor_fixings * libor_year_fraction
 print(f'libor_cashflows: \n{libor_cashflows}')
 

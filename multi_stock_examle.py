@@ -20,27 +20,28 @@ from curve_builder import bootstrap_curve_with_instrument_helpers, bootstrap_cur
 from vol_helper import (
     create_USD_swaption_helpers, create_EUR_swaption_helpers,
     create_JPY_swaption_helpers, create_GBP_swaption_helpers,
-    create_CHF_swaption_helpers, create_TWD_swaption_helpers
+    create_CHF_swaption_helpers, create_TWD_swaption_helpers,
+    create_black_vol_surface
 )
 
 from curve_builder import bootstrap_USD_curve
 from util import get_nearest_fixing_date, year_fraction, combine_schedule
 from leastSquareError import LongstaffSchwartz
-from models import HullWhiteModel
+from models import HullWhiteModel, BlackScholesMertonModel, MultiAssetModel
 
-from market_data import (get_deposit, get_swap, get_swaption, get_FRA, get_sofr_future)
+from market_data import (get_deposit, get_swap, get_swaption, get_FRA, get_sofr_future, get_volatility_surface)
 
 # conventions
-fixed_leg_conventions = Conventions.USFixedLegConventions()
-floating_leg_conventions = Conventions.USFloatingLegConventions()
-calendar = fixed_leg_conventions['calendar']
-date_rolling_convention = fixed_leg_conventions['date_rolling_convention']
-date_termination_convention = fixed_leg_conventions['date_termination_convention']
-frequency = floating_leg_conventions['frequency']
-dayCount = fixed_leg_conventions['dayCounter']
-currency = fixed_leg_conventions['currency']
-endOfMonth = fixed_leg_conventions['endOfMonth']
-rule = fixed_leg_conventions['rule']
+calendar = ql.UnitedStates(ql.UnitedStates.NYSE)
+date_rolling_convention = ql.ModifiedFollowing
+date_termination_convention = ql.ModifiedFollowing
+frequency = ql.Period('6M')
+
+currency = ql.USDCurrency()
+rule = ql.DateGeneration.Forward
+dayCount = ql.Actual365Fixed()
+libor_dayCount = ql.Actual360()
+libor_fixing_in_advance = True
 
 
 today = ql.Date().todaysDate()
@@ -53,44 +54,57 @@ print(f' settlement date: {settlementDate}')
 # prepare market data for curve and model calibration
 df_deposit = get_deposit(['1M', '2M', '3M', '6M', '9M'])
 df_swap = get_swap(['1Y', '2Y', '5Y', '7Y', '10Y', '15Y', '20Y', '25Y', '30Y'])
+riskFreeCurve = bootstrap_USD_curve(today, deposit=df_deposit, swap=df_swap)
 
-# swaption data
-df_swaption = get_swaption(['2Y', '3Y'], ['5Y', '5Y'])
+spot_AAPL = 250
+dividendCurve_AAPL = ql.FlatForward(today, 0.02, dayCount)  # Usually don't use flat curve in real world, just simplify for example.
+df_vol_surface_AAPL = get_volatility_surface('AAPL', ['1M', '2M', '3M', '6M', '9M'], [250, 275, 300, 325, 350])
+vol_surface_AAPL = create_black_vol_surface(df_vol_surface_AAPL, today)
+black_model_vol_surface_AAPL = BlackScholesMertonModel(riskFreeCurve, dividendCurve_AAPL, vol_surface_AAPL, spot_AAPL)
+
+spot_MSFT = 100
+dividendCurve_MSFT = ql.FlatForward(today, 0.01, dayCount)  # Usually don't use flat curve in real world, just simplify for example.
+df_vol_surface_MSFT = get_volatility_surface('MSFT', ['1M', '2M', '3M', '6M', '9M'], [100, 110, 120, 130, 140])
+vol_surface_MSFT = create_black_vol_surface(df_vol_surface_MSFT, today)
+black_model_vol_surface_MSFT = BlackScholesMertonModel(riskFreeCurve, dividendCurve_MSFT, vol_surface_MSFT, spot_MSFT)
+
+corrMatrix = [[1, 0.5], [0.5, 1]]
+processes = [black_model_vol_surface_AAPL.process, black_model_vol_surface_MSFT.process]  # note: don't support heston model as sub-process
+multiAssetModel = MultiAssetModel(processes, corrMatrix)
 
 
-# create curve and calibrate model by swaptions
-curve = bootstrap_USD_curve(today, deposit=df_deposit, swap=df_swap)
-hw_model = HullWhiteModel(today, curve, 'USD')
-hw_model.calibrate(df_swaption)
 
 
 # schedule for IRS, fixed leg and floating leg, and combined schedule. and fixing schedule(2 days before payment date)
 terminationDate = calendar.advance(settlementDate, ql.Period(3, ql.Years))
+endOfMonth = calendar.isEndOfMonth(terminationDate)
 paySchedule = ql.Schedule(settlementDate, terminationDate, frequency, calendar, date_rolling_convention, date_termination_convention, rule, endOfMonth)
 recSchedule = ql.Schedule(settlementDate, terminationDate, frequency, calendar, date_rolling_convention, date_termination_convention, rule, endOfMonth)
 paymentSchedule = combine_schedule(paySchedule, recSchedule)  # merge two schedules
 fixingSchedule = [calendar.advance(d,ql.Period(-2, ql.Days)) for d in paymentSchedule]  # fixing schedule(2 business days before payment date)
+stock_paths = multiAssetModel.monte_carlo_paths(fixingSchedule, 4)
 
+return_AAPL = stock_paths[0]/stock_paths[0].iloc[0]
+return_MSFT = stock_paths[1]/stock_paths[1].iloc[0]
+
+
+# Get minimum values between the two stock path DataFrames
+lower_return = pd.DataFrame(
+    np.minimum(return_AAPL, return_MSFT),
+    index=stock_paths[0].index,
+    columns=stock_paths[0].columns
+)
+
+print(f'lowest :\n {lower_return}')
 # generate monte carlo paths
 
-# create ibor index factory as input of monte carlo paths generators.
-def create_ibor_6M(ts):
-    return ql.IborIndex('MyIndex', ql.Period('6m'), 2, currency, calendar, date_rolling_convention, True, dayCount, ts)
-
-n_path = 6
-underlying_path, fixings, discountFactors = hw_model.monte_carlo_paths([create_ibor_6M], fixingSchedule, paymentSchedule, n_path)
-# notes: 
-# 1. the resulting underlying_path, fixings, discountFactors are dataframes with index of ql.Date.
-# 2. fixings is a list of dataframes, each dataframe is the fixing of ibor index.
-# 3. argument of index_factories is a list of functions that return an ibor index.
-# 4. the number of fixings in fixings is determined by the number of index_factories.
-
-fixings=fixings[0]
-print(f'fixings: \n{fixings}')
-
-# cashflow according to monte carlo paths.
-fixed_rate = 0.018
 notional = 1_000_000
+bermudian_knock_out = 1.1
+strike = 1.0
+european_knock_in = 0.95
+coupon_rate = 0.1
+fixing_in_advance = True
+
 
 # convert to list
 paySchedule = [d for d in paySchedule]
@@ -98,42 +112,68 @@ recSchedule = [d for d in recSchedule]
 
 # fixed cashflows
 year_fraction_rec = np.array(year_fraction(recSchedule, dayCount, accoumulative=False))
-fixed_cashflows = pd.DataFrame(notional * fixed_rate * year_fraction_rec, index=recSchedule)
+fixed_cashflows = pd.DataFrame(notional * coupon_rate * year_fraction_rec, index=recSchedule)
 print(f'\nfixed_cashflows: \n{fixed_cashflows}')
 
 
-# floating cashflows
-fixing_date_map = pd.Series(fixingSchedule, index=paymentSchedule)
-fixing_date = fixing_date_map[paySchedule]   # 1. get fixing date from map
-fixing_value = pd.DataFrame(fixings.loc[fixing_date].values, index=paySchedule) # 2. get fixing value from fixings with corresponding fixing date
-fixing_in_advance = True  # 3. process fixing-in-advance case if True
-if fixing_in_advance:
-    fixing_value = fixing_value.shift(1)
-year_fraction_pay = np.array(year_fraction(paySchedule, dayCount, accoumulative=False))[:,np.newaxis] # 4. get year fraction for pay leg
-floating_cashflows = notional * fixing_value * year_fraction_pay # 5. calculate floating cashflows
+# libor cash flow under deterministic yield curve.
+discountFactors = [riskFreeCurve.discount(d) for d in paymentSchedule]
+discountFactors = pd.DataFrame(discountFactors, index=paymentSchedule)
+print(f'discountFactors: \n{discountFactors}')
+libor_index = ql.IborIndex('MyIndex', ql.Period('6m'), 2, currency, calendar, date_rolling_convention, True, libor_dayCount, ql.YieldTermStructureHandle(riskFreeCurve))
+libor_fixings = [libor_index.fixing(d) for d in fixingSchedule]
+libor_fixings = pd.DataFrame(libor_fixings, paymentSchedule)
+if libor_fixing_in_advance:
+    libor_fixings = libor_fixings.shift(1)
+libor_year_fraction = np.array(year_fraction(paymentSchedule, libor_dayCount, accoumulative=False))[:, np.newaxis]
+libor_cashflows = notional * libor_fixings * libor_year_fraction
+print(f'libor_cashflows: \n{libor_cashflows}')
+
 
 
 # ensure same index for case that two leg has different payment schedule
 fixed_cashflows = fixed_cashflows.reindex(paymentSchedule) 
-floating_cashflows = floating_cashflows.reindex(paymentSchedule)
-print(f'\nfloating_cashflows: \n{floating_cashflows}')
-net_cashflows = fixed_cashflows.values - floating_cashflows  
+libor_cashflows = libor_cashflows.reindex(paymentSchedule)
+print(f'\nlibor_cashflows: \n{libor_cashflows}')
+net_cashflows = fixed_cashflows - libor_cashflows  
 print(f'\nnet cashflows: \n{net_cashflows}')
 
-# prepare data for LSE
-single_period_dcf = discountFactors/discountFactors.shift(1)
-exercise_dates = paymentSchedule[1:-1]
-exercisable = subset_to_bool(exercise_dates, net_cashflows.index)  # convert from a list of dates to a boolean series
-observations = fixings  # observation is for linear estimator of longstaff schwartz, irelevant of fixing-in-advance or fixing-in-arrears
-exercise_payoff = lambda x: np.zeros(len(x))   # The cashflow of calling(cancelling) the IRS is 0.
-lse = LongstaffSchwartz(
-    cashflows=net_cashflows.iloc[1:], # remove first row
-    discountFactors=single_period_dcf,
-    exercise_schedule=exercisable,
-    exercise_payoff=exercise_payoff,
-    observable=observations
-)
-lse.backward_induction()
-print(f'\nconfidence interval: {lse.confidence_interval()}')
-print(f'\nsurvival probability: {lse.survival_probability()}')
-print(f'\nexercise cashflows: \n{lse.exercise_cashflows()}')
+print(f'\nlower_return: \n{lower_return}')
+# vanilla option payoff regardless of knock-in
+S_T = lower_return.iloc[-1]
+knockin = S_T < european_knock_in
+print(f'knockin: \n{knockin}')
+vanilla_option_payoff = notional * np.maximum(strike - S_T, 0)
+print(f'\nvanilla option payoff regardless of knock-in: \n{vanilla_option_payoff}')
+eki_option_payoff = vanilla_option_payoff * knockin
+print(f'\noption payoff with condition of knock-in: \n{eki_option_payoff}')
+df_eki_option_payoff = pd.DataFrame(np.zeros_like(lower_return, dtype=float), index=paymentSchedule)
+df_eki_option_payoff.iloc[-1] = eki_option_payoff
+print(f'\ndf_eki_option_payoff: \n{df_eki_option_payoff}')
+
+
+
+# survival probability
+survival = pd.DataFrame(np.zeros_like(lower_return, dtype=bool), index=paymentSchedule)
+still_alive = np.ones((1, lower_return.shape[1]), dtype=bool)
+print(f'\nlower_return: \n{lower_return}')
+for d in paymentSchedule:
+    survival.loc[d] = still_alive
+    fixing_day = get_nearest_fixing_date(d, fixingSchedule)
+    still_alive = np.bitwise_and(still_alive, lower_return.loc[fixing_day] < bermudian_knock_out)
+print(f'\nsurvival: \n{survival}')
+
+total_cashflow = net_cashflows.values + df_eki_option_payoff
+print(f'\ntotal_cashflow: \n{total_cashflow}')
+
+cashflow_survival = total_cashflow.values * survival
+print(f'\n\ncashflow_survival: \n{cashflow_survival}')
+present_value = cashflow_survival * discountFactors.values
+print(f'\npresent_value: \n{present_value}')
+npv = np.sum(present_value, axis=0)
+print(f'npv: \n{npv}')
+valuation = npv.mean()
+print(f'valuation: {valuation}')
+std = npv.std()
+confidence_interval = (valuation - 1.96 * std / np.sqrt(npv.shape[0]), valuation + 1.96 * std / np.sqrt(npv.shape[0]))
+print(f'confidence interval: {confidence_interval}')
