@@ -10,6 +10,23 @@ class LongstaffSchwartz():
                  exercise_schedule: pd.Series|List, 
                  exercise_payoff: Callable|np.ndarray|pd.DataFrame,
                  observable: pd.DataFrame):
+
+        """
+        Initialize a Longstaff-Schwartz object.
+
+        Parameters
+        ----------
+        cashflows : pd.DataFrame
+            The net cashflows of a financial contract before applying discounting and early exercise (index: time, columns: path)
+        discountFactors : pd.DataFrame
+            Discount factor for one time period (from t to t-1), not discount to t0, for interest rate model, it has multiple column like cashflow, otherwise, if using deterministic discounting, it has only one column.
+        exercise_schedule : pd.Series|List
+            The early exercise schedule, single column value, for panda series, index must the same as cashflows, and dtype is bool, representing exercisable or not.
+        exercise_payoff : Callable|np.ndarray|pd.DataFrame
+            The payoff of early exercise, if callable, it takes fixing as input, if numpy array or pandas dataframe, it must have the same shape as cashflows.
+        observable : pd.DataFrame
+            The observable for least sqaure error estimation for early exercise, usually the fixing values of underling value.
+        """
         self.cashflows = cashflows
         self.discountFactors = discountFactors
         self.exercise_schedule = exercise_schedule

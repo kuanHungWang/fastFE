@@ -26,6 +26,22 @@ def calibration_detail(helpers):
 
 class GarmanKohlagenProcessModel():
     def __init__(self, foreignRiskCurve, domesticRiskFreeCurve, vol_curve, initialValue):
+        """
+        Initialize a Garman-Kohlhagen process model for FX option pricing.
+
+        Parameters
+        ----------
+        foreignRiskCurve: quantlib yield curve object
+            The yield curve for the foreign currency risk-free rate
+        domesticRiskFreeCurve: quantlib yield curve object
+            The yield curve for the domestic currency risk-free rate
+        vol_curve: ql.BlackVarianceSurface, ql.BlackVarianceCurve, or ql.BlackConstantVol object
+            The volatility term structure for the FX rate
+        initialValue: float
+            The initial spot FX rate
+            
+        """
+
         self.foreignRiskCurve = foreignRiskCurve
         self.domesticRiskFreeCurve = domesticRiskFreeCurve
         self.vol_curve=vol_curve
@@ -40,6 +56,22 @@ class GarmanKohlagenProcessModel():
 
 
     def monte_carlo_paths(self, fixingSchedule:ql.Schedule, numPaths:int):
+        """       
+        Parameters
+        ----------
+        fixingSchedule : ql.Schedule
+            Schedule of dates for which to generate simulated values
+        numPaths : int
+            Number of Monte Carlo paths to simulate
+            
+        Returns
+        -------
+        pandas.DataFrame
+            DataFrame containing the simulated paths. The index consists of the dates from the
+            fixing schedule, and each column represents one simulation path.
+            Shape: (len(fixingSchedule), numPaths)
+        """
+
         process = self.process
         # Time grid
         dayCount = ql.Actual365Fixed()
@@ -69,6 +101,22 @@ class GarmanKohlagenProcessModel():
 
 class BlackScholesMertonModel():
     def __init__(self, yield_curve, dividend_curve, vol_curve, initialValue):
+        """
+        Initialize a Black-Scholes-Merton process model for equity option pricing.
+
+        Parameters
+        ----------
+        yield_curve: quantlib yield curve object
+            The yield curve for the foreign currency risk-free rate
+        dividend_curve: quantlib yield curve object
+            The yield curve for the dividend yield of underlying asset
+        vol_curve: ql.BlackVarianceSurface, ql.BlackVarianceCurve, or ql.BlackConstantVol object
+            The volatility term structure for the underlying asset
+        initialValue: float
+            The initial spot price of underlying asset
+            
+        """
+
         self.yield_curve = yield_curve
         self.dividend_curve = dividend_curve
         self.vol_curve=vol_curve
@@ -83,6 +131,21 @@ class BlackScholesMertonModel():
 
 
     def monte_carlo_paths(self, fixingSchedule:ql.Schedule, numPaths:int):
+        """       
+        Parameters
+        ----------
+        fixingSchedule : ql.Schedule
+            Schedule of dates for which to generate simulated values
+        numPaths : int
+            Number of Monte Carlo paths to simulate
+            
+        Returns
+        -------
+        pandas.DataFrame
+            DataFrame containing the simulated paths. The index consists of the dates from the
+            fixing schedule, and each column represents one simulation path.
+            Shape: (len(fixingSchedule), numPaths)
+        """
         process = self.process
         # Time grid
         dayCount = ql.Actual365Fixed()
@@ -117,6 +180,28 @@ class HullWhiteModel():
         self.model = None
 
     def calibrate(self, swaption:pd.DataFrame):
+        """
+        
+        Parameters
+        ----------
+        swaption : pd.DataFrame
+            DataFrame containing swaption market data with the following required columns:
+            - 'maturity': option expiry period as string (e.g., '1Y', '5Y') - option tenor
+            - 'length': underlying swap length as string (e.g., '5Y', '10Y') - swap tenor
+            - 'volatility': market quoted volatility as float (e.g., 0.2 for 20%)
+            
+            These columns are used by the create_swaption_helper function to create
+            QuantLib SwaptionHelper objects for model calibration.
+            
+        Returns
+        -------
+        None
+            The calibrated model is stored as self.model, and calibration details
+            are stored as self.calibration_detail
+        """
+
+
+
         builders ={'USD': create_USD_swaption_helpers, 'EUR': create_EUR_swaption_helpers, 'JPY': create_JPY_swaption_helpers, 'GBP': create_GBP_swaption_helpers, 'CHF': create_CHF_swaption_helpers, 'TWD': create_TWD_swaption_helpers}
         term_structure = ql.YieldTermStructureHandle(self.curve)
         model = ql.HullWhite(term_structure)
@@ -138,6 +223,40 @@ class HullWhiteModel():
 
 
     def monte_carlo_paths(self,  index_factories, fixingSchedule, paymentSchedule, numPaths):
+        """
+        Generate Monte Carlo simulation paths for interest rates using the Hull-White model.
+        
+        This method simulates short rate paths using the calibrated Hull-White model parameters,
+        constructs forward curves from these paths, and calculates relevant financial quantities
+        such as index fixings and discount factors.
+        
+        Parameters
+        ----------
+        index_factories : list of callable
+            List of factory functions that create interest rate indices which take only ql.YieldTermStructureHandle as input. 
+            These are the indexes that you want the fixing value at each fixing date.
+        fixingSchedule : ql.Schedule
+            Schedule of dates for which to generate index fixings
+        paymentSchedule : ql.Schedule
+            Schedule of dates for which to calculate discount factors
+        numPaths : int
+            Number of Monte Carlo paths to simulate
+            
+        Returns
+        -------
+        tuple
+            A tuple containing three elements:
+            - underlying_path_df : pandas.DataFrame
+              DataFrame containing the simulated short rate paths. The index consists of
+              daily dates, and each column represents one simulation path.
+            - fixings_dfs : list of pandas.DataFrame
+              List of DataFrames containing the simulated index fixings for each index factory.
+              Each DataFrame has fixing dates as index and paths as columns.
+            - discountFactors_df : pandas.DataFrame
+              DataFrame containing the simulated discount factors. The index consists of
+              payment dates, and each column represents one simulation path.
+        """
+        
         a, sigma = self.model.params()
         term_structure = ql.YieldTermStructureHandle(self.curve)
         process = ql.HullWhiteProcess(term_structure, a, sigma)
@@ -202,12 +321,38 @@ class HullWhiteModel():
 
 class HestonModel():
     def __init__(self, yield_curve, dividend_curve, calendar=ql.WeekendsOnly()):
+
+        """
+        Initialize a Black-Scholes-Merton process model for equity option pricing.
+
+        Parameters
+        ----------
+        yield_curve: quantlib yield curve object
+            The yield curve for the foreign currency risk-free rate
+        dividend_curve: quantlib yield curve object
+            The yield curve for the dividend yield of underlying asset
+        calendar: quantlib calendar object
+            The calendar for the underlying asset
+            
+        """
         self.yield_curve = yield_curve
         self.dividend_curve = dividend_curve
         self.calendar = calendar
         self.model = None
 
     def calibrate(self, vol:pd.DataFrame, spot:float):
+        """
+        Calibrate the Heston model to the given volatility surface.
+
+        Parameters
+        ----------
+        vol: pd.DataFrame
+            The volatility surface, which contains columns:
+            option_tenor:str, strike:float, vol:float, 
+
+        spot: float
+            The spot price of the underlying asset
+        """
         initialValue = ql.QuoteHandle(ql.SimpleQuote(spot))
         theta = 0.010
         kappa = 0.600
@@ -282,10 +427,40 @@ class HestonModel():
 
 class MultiAssetModel():
     def __init__(self, processes, correlation_matrix):
+        """
+        Initialize a MultiAssetModel object.
+
+        Parameters
+        ----------
+        processes: list of quantlib StochasticProcess objects
+            The processes for the assets
+        correlation_matrix: quantlib Matrix object
+            The correlation matrix for the assets
+        Note:
+        Support type of processes: black_scholes_merton_process, garman_kohlagen_process, hull_white_process
+        """
         self.processes = processes
         self.correlation_matrix = correlation_matrix
         
     def monte_carlo_paths(self, fixingSchedule:ql.Schedule, numPaths:int, dayCount:ql.DayCounter=ql.Actual365Fixed()):
+        """
+        Generate paths for multiple assets based on fixing schedule.
+
+        Parameters
+        ----------
+        fixingSchedule : ql.Schedule
+            Schedule of dates for which to generate simulated values
+        numPaths : int
+            Number of Monte Carlo paths to simulate
+        dayCount : ql.DayCounter
+            Day counter for the fixing schedule
+
+        Returns
+        -------
+        list of pandas.DataFrame
+            List of DataFrames containing the simulated paths. Each DataFrame has the fixing schedule as index and columns as paths.
+        """
+
         process = ql.StochasticProcessArray(self.processes, self.correlation_matrix)
         # Time grid
         time_grid = year_fraction(fixingSchedule, dayCount, accoumulative=True)

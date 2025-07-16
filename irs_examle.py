@@ -1,40 +1,98 @@
 import QuantLib as ql
 import numpy as np
 import pandas as pd
-from util import leg_to_series, subset_to_bool, get_nearest_fixing_date
+from util import (
+    subset_to_bool,
+    get_nearest_fixing_date,
+    year_fraction,
+    combine_schedule,
+    leg_to_series
+)
 from datetime import datetime
 from rate_helpers import (
-    create_USD_deposit_rate_helpers,
-    create_USD_swap_rate_helpers,
+    to_ql_date,
+    get_settlement_date,
     create_deposit_rate_helpers,
+    create_fra_rate_helpers,
     create_swap_rate_helpers,
+    create_sofr_future_rate_helpers,
     create_OIS_helper,
-    create_fra_rate_helpers,  # <-- corrected
     create_bond_helper,
-    create_sofr_future_rate_helpers)
-from curve_builder import bootstrap_USD_curve, bootstrap_EUR_curve, bootstrap_JPY_curve, bootstrap_GBP_curve, bootstrap_TWD_curve
+    create_USD_deposit_rate_helpers,
+    create_EUR_deposit_rate_helpers,
+    create_JPY_deposit_rate_helpers,
+    create_TWD_deposit_rate_helpers,
+    create_CHF_deposit_rate_helpers,
+    create_GBP_deposit_rate_helpers,
+    create_USD_swap_rate_helpers,
+    create_EUR_swap_rate_helpers,
+    create_JPY_swap_rate_helpers,
+    create_TWD_swap_rate_helpers,
+    create_CHF_swap_rate_helpers,
+    create_GBP_swap_rate_helpers,
+    create_EUR_OIS_helpers,
+    create_GBP_OIS_helpers,
+    create_JPY_OIS_helpers,
+    create_CHF_OIS_helpers,
+    create_USD_FRA_helpers,
+    create_EUR_FRA_helpers,
+    create_CHF_FRA_helpers,
+    create_GBP_FRA_helpers,
+    create_JPY_FRA_helpers
+)
+from curve_builder import (
+    bootstrap_curve_with_instrument_helpers,
+    bootstrap_curve,
+    bootstrap_USD_curve,
+    bootstrap_EUR_curve,
+    bootstrap_JPY_curve,
+    bootstrap_GBP_curve,
+    bootstrap_TWD_curve
+)
 from conventions import Conventions
-from typing import Literal, Tuple
-from curve_builder import bootstrap_curve_with_instrument_helpers, bootstrap_curve
+from typing import Literal, Tuple, Callable, Dict, List
 from vol_helper import (
-    create_USD_swaption_helpers, create_EUR_swaption_helpers,
-    create_JPY_swaption_helpers, create_GBP_swaption_helpers,
-    create_CHF_swaption_helpers, create_TWD_swaption_helpers)
-from curve_builder import bootstrap_USD_curve
-from util import get_nearest_fixing_date, year_fraction, combine_schedule
+    create_black_vol_curve,
+    create_black_vol_surface,
+    create_heston_model_helper,
+    create_swaption_helper,
+    create_USD_swaption_helpers,
+    create_EUR_swaption_helpers,
+    create_JPY_swaption_helpers,
+    create_GBP_swaption_helpers,
+    create_CHF_swaption_helpers,
+    create_TWD_swaption_helpers
+)
 from leastSquareError import LongstaffSchwartz
-from models import HullWhiteModel
-from market_data import (get_deposit, get_swap, get_swaption, get_FRA, get_sofr_future)
+from models import (
+    calibration_detail,
+    GarmanKohlagenProcessModel,
+    BlackScholesMertonModel,
+    HullWhiteModel,
+    HestonModel,
+    MultiAssetModel
+)
+from market_data import (
+    get_deposit,
+    get_swap,
+    get_swaption,
+    get_OIS,
+    get_FRA,
+    get_sofr_future,
+    get_volatility_surface,
+    get_price,
+    get_dividend_rate
+)
 
-# Description:
-# keywords: cancellable, Bermudan exercise, interest rate swap, IRS, libor floating leg, fixing-in-advance
-# fixed rate cancellable IRS (Libor)
-# rec fixed leg, 30/360, frequency 6M
-# pay floating: index: 6M libor, act/360, frequency 6M
-# cancelable schedule: same as fixed leg frequency
-# floating leg fixing schedule: 2 days before payment date, fixing-in-advance
-# tenor: 3Y
-# fixing rate: 1.8%, notional: 1M USD
+"""Description:
+keywords: cancellable, Bermudan exercise, interest rate swap, IRS, libor floating leg, fixing-in-advance
+fixed rate cancellable IRS (Libor)
+rec fixed leg, 30/360, frequency 6M
+pay floating: index: 6M libor, act/360, frequency 6M
+cancelable schedule: same as fixed leg frequency
+floating leg fixing schedule: 2 days before payment date, fixing-in-advance
+tenor: 3Y
+fixing rate: 1.8%, notional: 1M USD"""
 
 # contract parameters
 fixed_rate = 0.018

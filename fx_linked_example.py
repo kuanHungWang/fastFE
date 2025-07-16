@@ -1,48 +1,100 @@
 import QuantLib as ql
 import numpy as np
 import pandas as pd
-from util import leg_to_series, subset_to_bool
+from util import (
+    subset_to_bool,
+    get_nearest_fixing_date,
+    year_fraction,
+    combine_schedule,
+    leg_to_series
+)
 from datetime import datetime
 from rate_helpers import (
-    create_USD_deposit_rate_helpers,
-    create_USD_swap_rate_helpers,
+    to_ql_date,
+    get_settlement_date,
     create_deposit_rate_helpers,
+    create_fra_rate_helpers,
     create_swap_rate_helpers,
+    create_sofr_future_rate_helpers,
     create_OIS_helper,
-    create_fra_rate_helpers,  # <-- corrected
     create_bond_helper,
-    create_sofr_future_rate_helpers
+    create_USD_deposit_rate_helpers,
+    create_EUR_deposit_rate_helpers,
+    create_JPY_deposit_rate_helpers,
+    create_TWD_deposit_rate_helpers,
+    create_CHF_deposit_rate_helpers,
+    create_GBP_deposit_rate_helpers,
+    create_USD_swap_rate_helpers,
+    create_EUR_swap_rate_helpers,
+    create_JPY_swap_rate_helpers,
+    create_TWD_swap_rate_helpers,
+    create_CHF_swap_rate_helpers,
+    create_GBP_swap_rate_helpers,
+    create_EUR_OIS_helpers,
+    create_GBP_OIS_helpers,
+    create_JPY_OIS_helpers,
+    create_CHF_OIS_helpers,
+    create_USD_FRA_helpers,
+    create_EUR_FRA_helpers,
+    create_CHF_FRA_helpers,
+    create_GBP_FRA_helpers,
+    create_JPY_FRA_helpers
 )
-from curve_builder import bootstrap_USD_curve, bootstrap_EUR_curve, bootstrap_JPY_curve, bootstrap_GBP_curve, bootstrap_TWD_curve
+from curve_builder import (
+    bootstrap_curve_with_instrument_helpers,
+    bootstrap_curve,
+    bootstrap_USD_curve,
+    bootstrap_EUR_curve,
+    bootstrap_JPY_curve,
+    bootstrap_GBP_curve,
+    bootstrap_TWD_curve
+)
 from conventions import Conventions
-from typing import Literal, Tuple
-from curve_builder import bootstrap_curve_with_instrument_helpers, bootstrap_curve
+from typing import Literal, Tuple, Callable, Dict, List
 from vol_helper import (
-    create_USD_swaption_helpers, create_EUR_swaption_helpers,
-    create_JPY_swaption_helpers, create_GBP_swaption_helpers,
-    create_CHF_swaption_helpers, create_TWD_swaption_helpers,
-    create_black_vol_curve, create_black_vol_surface
+    create_black_vol_curve,
+    create_black_vol_surface,
+    create_heston_model_helper,
+    create_swaption_helper,
+    create_USD_swaption_helpers,
+    create_EUR_swaption_helpers,
+    create_JPY_swaption_helpers,
+    create_GBP_swaption_helpers,
+    create_CHF_swaption_helpers,
+    create_TWD_swaption_helpers
+)
+from leastSquareError import LongstaffSchwartz
+from models import (
+    calibration_detail,
+    GarmanKohlagenProcessModel,
+    BlackScholesMertonModel,
+    HullWhiteModel,
+    HestonModel,
+    MultiAssetModel
+)
+from market_data import (
+    get_deposit,
+    get_swap,
+    get_swaption,
+    get_OIS,
+    get_FRA,
+    get_sofr_future,
+    get_volatility_surface,
+    get_price,
+    get_dividend_rate
 )
 
-from curve_builder import bootstrap_USD_curve
-from util import get_nearest_fixing_date, year_fraction, combine_schedule
-from leastSquareError import LongstaffSchwartz
-from models import HullWhiteModel, HestonModel, BlackScholesMertonModel, GarmanKohlagenProcessModel
 
-from market_data import (
-    get_deposit, get_swap, get_swaption, 
-    get_FRA, get_sofr_future, get_volatility_surface, get_price, get_dividend_rate)
 
-# Description:
-# Keywords: fx linked, single currency, daily range accrual, swap.
-# tenor: 1Y
-# notional: 1M 
-# pay 3M Euribor coupon, act360, fixing in advance
-# receive daily range accrual coupon, 30/360
-# coupon rate: 2%
-# range: 0.99< EURUSD < 1.2
-# for each payment period, use the fixing value 5 days prior to the payment date for remaining fixing period
-# calculation of range accrual: 
+"""Description:
+Keywords: fx linked, single currency, daily range accrual, swap.
+tenor: 1Y
+notional: 1M 
+pay 3M Euribor coupon, act360, fixing in advance
+receive 2% daily range accrual coupon, 30/360
+range: 0.99< EURUSD < 1.2
+for each payment period, use the fixing value 5 days prior to the payment date for remaining fixing period
+calculation of range accrual: 2% * (in range days / total days)"""
 
 # contract parameters
 notional = 1_000_000

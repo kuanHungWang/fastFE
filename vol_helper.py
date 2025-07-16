@@ -29,7 +29,7 @@ def create_black_vol_surface(df: pd.DataFrame, reference_date:ql.Date, dayCount:
 def create_heston_model_helper(df: pd.DataFrame, spot:float,yield_curve, dividend_curve, calendar=ql.NullCalendar(),engine=None):
     """
     Create a list of QuantLib HestonModelHelper objects from a DataFrame.
-    df: columns:option tenor:str, spot:float, strike:float, vol:float, 
+    df: columns:option tenor:str, strike:float, vol:float, 
     
     """
     yield_curve_handler = ql.YieldTermStructureHandle(yield_curve)

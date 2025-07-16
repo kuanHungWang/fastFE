@@ -14,30 +14,35 @@ libor_dayCount = ql.Actual360()
 date_rolling_convention = ql.Following
 
 
-#***
-# today's date
+#@Description
+"""today's date"""
+#@code
 today = ql.Date().todaysDate()
 
-#***
-# add period to a date
+#@Description
+"""add period to a date"""
+#@code
 date = today + ql.Period(1, ql.Years)
 date = today + ql.Period("6M")
 
-#***
-# A specific date
+#@Description
+"""A specific date"""
+#@code
 date = ql.Date(1, 1, 2025)
 
-#***
-# create a schedule from start date to termination date and frequency
-
+#@Description
+"""create a schedule from start date to termination date and frequency"""
+#@code
 startDate = ql.Date().todaysDate()
 terminationDate = startDate + ql.Period(3, ql.Years)
 frequency = ql.Period(ql.Quarterly)
 schedule = ql.MakeSchedule(startDate, terminationDate, frequency)
 
-#***
-# Market convention of dates, rolling, daycount, schedule generation
-# keywordsL following, modified following, preceding, modified preceding, forward, backward, third wednesday, twentieth, actual/360, actual/365, thirty/360, 30/360 business/252, calendar, joint calendar
+#@Description
+"""Market convention of dates, rolling, daycount, schedule generation
+keywordsL following, modified following, preceding, modified preceding, forward, backward, third wednesday, twentieth, actual/360, actual/365, thirty/360, 30/360 business/252, calendar, joint calendar"""
+
+#@code
 # date rolling market conventions, used to determine how a date change if it is not a business day
 ql.Following   # Move to next business day if it is not a business day
 ql.ModifiedFollowing   # Move to next business day if it is not a business day, but if the date is the last business day of the month, move to previous business day.
@@ -70,9 +75,10 @@ ql.SimpleDayCounter()
 ql.Business252()
 
 
-#***
-# calendar
-
+#@Description
+"""create calendar for specific country, exchange or market, and join calendar for multiple calendars
+keywords: calendar, exchange calendar, country calendar, joint calendar"""
+#@code
 calendar1 = ql.UnitedKingdom()
 calendar2 = ql.TARGET()
 # available calendar: Argentina, Australia, Austria, BespokeCalendar, Botswana, Brazil, Canada, China, CzechRepublic, Denmark, Finland, France, Germany, HongKong, Hungary, Iceland, India, Indonesia, Israel, Italy, Japan, JointCalendar, Mexico, NewZealand, Norway, NullCalendar, Poland, Romania, Russia, SaudiArabia, Singapore, Slovakia, SouthAfrica, SouthKorea, Sweden, Switzerland, Taiwan, TARGET, Thailand, Turkey, Ukraine, UnitedKingdom, UnitedStates, WeekendsOnly
@@ -87,9 +93,10 @@ joint_calendar = ql.JointCalendar(ql.TARGET(), ql.Poland())
 
 
 
-#***
-# Rate helper, used to bootstrap yield curve. helper type: deposit, fra, swap, sofr, ois, bond
-
+#@Description
+"""Rate helper, used to bootstrap yield curve. helper type: deposit, fra, swap, sofr, ois, bond
+"""
+#@code
 from datetime import datetime
 df_deposit = pd.DataFrame({'tenor': ['1M', '2M', '3M', '6M', '1Y'], 'rates': [0.015, 0.018, 0.02, 0.022, 0.025]})
 deposit_helpers = create_deposit_rate_helpers(df_deposit, conventions=Conventions.USFixedLegConventions())
@@ -112,8 +119,9 @@ conventions['frequency'] = ql.Period('6M')
 bond_helpers = create_bond_helper(df_bond, conventions=conventions)
 
 
-#***
-# quick deposit helper builder for each currency without need to pass conventions
+#@Description
+"""quick deposit helper builder for each currency without need to pass conventions"""
+#@code
 df_deposit = pd.DataFrame({'tenor': ['1M', '2M', '3M', '6M', '1Y'], 'rates': [0.015, 0.018, 0.02, 0.022, 0.025]})
 create_USD_deposit_rate_helpers(df_deposit)
 create_EUR_deposit_rate_helpers(df_deposit)
@@ -122,8 +130,9 @@ create_TWD_deposit_rate_helpers(df_deposit)
 create_CHF_deposit_rate_helpers(df_deposit)
 create_GBP_deposit_rate_helpers(df_deposit)
 
-#***
-# quick swap helper builder for each currency without need to pass conventions
+#@Description
+"""quick swap helper builder for each currency without need to pass conventions"""
+#@code
 df_swap = pd.DataFrame({'rate': [0.015, 0.018, 0.02], 'tenor': ['5Y', '7Y', '10Y']})
 create_USD_swap_rate_helpers(df_swap)
 create_EUR_swap_rate_helpers(df_swap)
@@ -132,16 +141,18 @@ create_TWD_swap_rate_helpers(df_swap)
 create_CHF_swap_rate_helpers(df_swap)
 create_GBP_swap_rate_helpers(df_swap)
 
-#***
-# quick OIS helper builder for each currency without need to pass conventions
+#@Description
+"""quick OIS helper builder for each currency without need to pass conventions"""
+#@code
 df_OIS = pd.DataFrame({'tenor': ['1M', '2M', '3M', '6M', '1Y'], 'rate': [0.015, 0.018, 0.02, 0.022, 0.025]})
 create_EUR_OIS_helpers(df_OIS)
 create_GBP_OIS_helpers(df_OIS)
 create_JPY_OIS_helpers(df_OIS)
 create_CHF_OIS_helpers(df_OIS)
 
-#***
-# quick FRA helper builder for each currency without need to pass conventions
+#@Description
+"""quick FRA helper builder for each currency without need to pass conventions"""
+#@code
 df_fra = pd.DataFrame({'monthsToStart': [1, 2, 3], 'monthsToEnd': [7, 8, 9], 'rates': [0.021, 0.023, 0.025]})
 create_USD_FRA_helpers(df_fra)
 create_EUR_FRA_helpers(df_fra)
@@ -151,8 +162,9 @@ create_JPY_FRA_helpers(df_fra)
 
 
 
-#***
-# Build curve from helpers.
+#@Description
+"""Build curve from helpers."""
+#@code
 today = ql.Date().todaysDate()
 df_deposit = pd.DataFrame({'tenor': ['1M', '2M', '3M', '6M', '9M'], 'rates': [0.015, 0.018, 0.02, 0.022, 0.025]})
 deposit_helpers = create_USD_deposit_rate_helpers(df_deposit)
@@ -163,8 +175,9 @@ curve = bootstrap_curve_with_instrument_helpers(today, deposit_helpers, ql.Actua
 curve = bootstrap_curve_with_instrument_helpers(today, deposit_helpers + swap_helpers, ql.Actual360())  # use deposit and swap helpers
 
 
-#***
-# Build curve from  market data dataFrame
+#@Description
+"""Build curve from  market data dataFrame"""
+#@code
 from conventions import Conventions
 today = ql.Date().todaysDate()
 
@@ -177,9 +190,11 @@ curve = bootstrap_curve(
     Conventions.USFloatingLegConventions())
     )
 
-#***
-# Build curve from market data dataFrame for specific currency witout need to pass conventions, which is the easiest way to build curve
-# keywords: USD curve, EUR curve, JPY curve, GBP curve, TWD curve, quick curve builder
+#@Description
+"""Build curve from market data dataFrame for specific currency witout need to pass conventions, which is the easiest way to build curve
+keywords: USD curve, EUR curve, JPY curve, GBP curve, TWD curve, quick curve builder
+"""
+#@code
 curve = bootstrap_USD_curve(today, deposit=df_deposit, swap=df_swap)  # fast builder for USD curve without conventions
 curve = bootstrap_EUR_curve(today, deposit=df_deposit, swap=df_swap)  # fast builder for EUR curve without conventions
 curve = bootstrap_JPY_curve(today, deposit=df_deposit, swap=df_swap)  # fast builder for JPY curve without conventions
@@ -188,9 +203,10 @@ curve = bootstrap_TWD_curve(today, deposit=df_deposit, swap=df_swap)  # fast bui
 
 
 
-#***
-# swaption helper builder, use to calibrate interest rate model.
-# keywords: swaption helper, volatility, interest rate model, calibration
+#@Description
+"""swaption helper builder, use to calibrate interest rate model.
+keywords: swaption helper, volatility, interest rate model, calibration"""
+#@code
 from curve_builder import bootstrap_USD_curve
 today = ql.Date().todaysDate()
 df_deposit = pd.DataFrame({
@@ -225,9 +241,10 @@ swaption_helpers = create_CHF_swaption_helpers(df_swaption, curve, engine)  # fa
 swaption_helpers = create_TWD_swaption_helpers(df_swaption, curve, engine)  # fast builder for TWD swaption without conventions
 
 
-#***
-# heston model helper, use to calibrate heston model.
-# keywords: heston model, volatility, calibration, volatility helper
+#@Description
+"""heston model helper, use to calibrate heston model.
+keywords: heston model, volatility, calibration, volatility helper"""
+# @code
 heston_vol_df = pd.DataFrame({
     'option_tenor': ['1M', '2M', '3M', '6M', '9M'],
     'strike': [0.015, 0.018, 0.02, 0.022, 0.025],
@@ -239,9 +256,10 @@ riskFreeCurve = ql.FlatForward(today, 0.04, dayCount)  # in real world we usuall
 dividendCurve = ql.FlatForward(today, 0.01, dayCount)
 heston_helpers = create_heston_model_helper(heston_vol_df, spot, riskFreeCurve, dividendCurve)
 
-#***
-# Black-Scholes-Merton Model (simple equity option)
-# Keywords: Black-Scholes-Merton Model, BSM Model, equity option, constant volatility, volatility curve, volatility surface, local volatility, deterministic volatility, monte carlo, paths generation
+#@Description
+"""Black-Scholes-Merton Model (simple equity option)
+keywords: Black-Scholes-Merton Model, BSM Model, equity option, constant volatility, volatility curve, volatility surface, local volatility, deterministic volatility, monte carlo, paths generation"""
+#@code
 import QuantLib as ql
 import pandas as pd
 from vol_helper import create_black_vol_curve
@@ -271,9 +289,9 @@ paths = black_model_vol_curve.monte_carlo_paths(fixingSchedule, 4)
 
 
 
-#***
-# Heston Model (stochastic volatility)
-# Keywords: Heston Model, stochastic volatility, equity option, calibration, monte carlo, paths generation
+#@Description
+"""Heston Model (stochastic volatility)
+keywords: Heston Model, stochastic volatility, equity option, calibration, monte carlo, paths generation"""
 import pandas as pd
 import QuantLib as ql
 from models import HestonModel
@@ -294,9 +312,10 @@ fixingSchedule = ql.Schedule(today, today + ql.Period('1Y'), ql.Period('1M'), ca
 paths = heston_model.monte_carlo_paths(fixingSchedule, 4)
 
 
-#***
-# Garman-Kohlagen FX Model
-# Keywords: Garman-Kohlagen Model, FX Model, constant volatility, volatility curve, volatility surface, local volatility, deterministic volatility, monte carlo, paths generation
+#@Description
+"""Garman-Kohlagen FX Model
+keywords: Garman-Kohlagen Model, FX Model, constant volatility, volatility curve, volatility surface, local volatility, deterministic volatility, monte carlo, paths generation"""
+#@code
 import QuantLib as ql
 from models import GarmanKohlagenProcessModel
 today = ql.Date().todaysDate()
@@ -326,9 +345,10 @@ fixingSchedule = ql.Schedule(today, today + ql.Period('1Y'), ql.Period('1M'), ca
 paths = fxModel.monte_carlo_paths(fixingSchedule, 4)
 print(paths)
 
-#***
-# Multi-Asset Model
-# keyword: multi asset, multi process, hybrid model, hybrid process, monte carlo, paths generation
+#@Description
+"""Multi-Asset Model
+keyword: multi asset, multi process, hybrid model, hybrid process, monte carlo, paths generation"""
+#@code
 import QuantLib as ql
 from models import MultiAssetModel
 today = ql.Date().todaysDate()
@@ -341,16 +361,18 @@ multiAssetModel = MultiAssetModel(processes, corrMatrix)
 fixingSchedule = ql.Schedule(today, today + ql.Period('1Y'), ql.Period('1M'), calendar, ql.Following, ql.Following, ql.DateGeneration.Backward, False)
 paths = multiAssetModel.monte_carlo_paths(fixingSchedule, 4)
 
-#***
-# Get Volatility Surface (utility)
-# volatility, market data, local volatility, volatility surface
+#@Description
+"""Get Volatility Surface (utility)
+volatility, market data, local volatility, volatility surface"""
+#@code
 from market_data import get_volatility_surface
 df_vol_surface = get_volatility_surface('AAPL', ['1M', '2M', '3M', '6M', '9M'], [100, 110, 120, 130, 140])
 
 
-#***
-# LongstaffSchwartz, Bermudan Option, American Option, early exercise, least square error method
-# Keywords: LongstaffSchwartz, Bermudan Option, American Option, early exercise, least square error method
+#@Description
+"""LongstaffSchwartz, Bermudan Option, American Option, early exercise, least square error method
+keywords: LongstaffSchwartz, Bermudan Option, American Option, early exercise, least square error method"""
+#@code
 from leastSquareError import LongstaffSchwartz
 today = ql.Date().todaysDate()
 settlmentDate = today + ql.Period('2D')
@@ -376,9 +398,10 @@ ls.exercise_cashflows() # return expected cashflows of early exercise of each pe
 ls.exercise_mask()  # return whether to exercise at each period and each path.
 
 
-#***
-# Create interest rate index
-# Keywords: interest rate index, libor, ibor, euribor, overnight, SOFR, 
+#@Description
+"""Create interest rate index
+keywords: interest rate index, libor, ibor, euribor, overnight, SOFR, """
+#@code
 yieldCurve = ql.FlatForward(today, 0.04, ql.Actual365Fixed())
 ibor_index = ql.IborIndex('MyIborIndex', ql.Period('6m'), 2, currency, calendar, date_rolling_convention, True, libor_dayCount, ql.YieldTermStructureHandle(yieldCurve))
 euribor_index = ql.Euribor(ql.Period('6M'), ql.YieldTermStructureHandle(yieldCurve))
@@ -388,22 +411,28 @@ overnight_index = ql.OvernightIndex('MyOvernightIndex', fixingDays, currency, ca
 cms10Y =ql.UsdLiborSwapIsdaFixAm(ql.Period('10Y'), ql.YieldTermStructureHandle(yieldCurve))
 
 
-#***
-# Get fixing values of a index
+#@Description
+"""Get fixing values of a index
+keywords: fixing, index fixing, index value"""
+#@code
 yieldCurve = ql.FlatForward(today, 0.04, ql.Actual365Fixed())
 ibor_index = ql.IborIndex('MyIborIndex', ql.Period('6m'), 2, currency, calendar, date_rolling_convention, True, libor_dayCount, ql.YieldTermStructureHandle(yieldCurve))
 d = calendar.advance(today,ql.Period(2, ql.Days))
 libor_fixings = ibor_index.fixing(d)
 
-#***
-# get discount factor from a yield curve
+#@Description
+"""get discount factor from a yield curve
+keywords: discount factor, yield curve, discount"""
+#@code
 yieldCurve = ql.FlatForward(today, 0.04, ql.Actual365Fixed())
 d = calendar.advance(today,ql.Period("1Y"))
 discount_factor = yieldCurve.discount(d)
 
 
-#***
-# calculate floating cashflow with libor index in deterministic interest rate environment.
+#@Description
+"""calculate floating cashflow with libor index in deterministic interest rate environment.
+keywords: floating cashflow, libor index, deterministic interest rate environment"""
+#@code
 yieldCurve = ql.FlatForward(today, 0.04, ql.Actual365Fixed())  # In real world we usually don't use flat forward curve, here just for example.
 libor_index = ql.IborIndex('MyIndex', ql.Period('6m'), 2, currency, calendar, date_rolling_convention, True, libor_dayCount, ql.YieldTermStructureHandle(yieldCurve))
 libor_fixings = [libor_index.fixing(d) for d in fixingSchedule]  # get fixing values for each fixing date from index using .fixing() method
@@ -413,8 +442,11 @@ if fixing_in_advance:
 libor_year_fraction = np.array(year_fraction(paymentSchedule, libor_dayCount, accoumulative=False))[:, np.newaxis]  # reshape to (n, 1) for broadcast.
 libor_cashflows = notional * libor_fixings * libor_year_fraction
 
-#***
-# calculate floating cashflow with libor index in stochastic interest rate with multiple simulation paths of fixing.
+#@Description
+"""calculate floating cashflow with libor index in stochastic interest rate with multiple simulation paths of fixing.
+keywords: floating cashflow, libor index, stochastic interest rate, monte carlo simulation of floating leg"""
+
+#@code
 # fixings = ...  # get fixing_value from model or other sources.
 # step 1. get fixing rate of floating index, here are three ways of doing it, all have same result.
 # method 1: The easiest way, use fixings as it is.
@@ -431,9 +463,11 @@ floating_cashflows = notional * fixing_value.values * year_fraction_pay  # step 
 floating_cashflows = pd.DataFrame(floating_cashflows, index=paySchedule)  # step 4. convert to dataframe, use paySchedule as index to align with other cashflows.
 
 
-#***
-# calculate sofr compounded cashflows
+#@Description
+"""calculate sofr compounded cashflows
+"""
 
+#@code
 floating_cashflows = []
 for i in range(1, len(paySchedule)):
     period_start = paySchedule[i-1]
@@ -452,7 +486,8 @@ for i in range(1, len(paySchedule)):
 floating_cashflows = np.vstack(floating_cashflows)
 floating_cashflows = pd.DataFrame(floating_cashflows, index=paySchedule[1:])
 
-#***
-# Create interest rate index
-# Keywords: libor, ibor, euribor, OIS, SOFR, 
+#@Description
+"""Create interest rate index
+keywords: libor, ibor, euribor, OIS, SOFR, """
+#@code
 ql.IborIndex('MyIndex', ql.Period('6m'), 2, currency, calendar, date_rolling_convention, True, libor_dayCount, ql.YieldTermStructureHandle(yieldCurve))
