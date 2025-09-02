@@ -82,6 +82,26 @@ def bootstrap_curve(settlementDate, dayCount, deposit: Tuple=None, swap: Tuple=N
     return bootstrap_curve_with_instrument_helpers(settlementDate, helpers, dayCount)
 
 def bootstrap_USD_curve(settlementDate, deposit: pd.DataFrame=None, swap: pd.DataFrame=None, OIS: pd.DataFrame=None, FRA: pd.DataFrame=None, method: Literal['logLinearDiscount', 'logCubicDiscount','linearZero','cubicZero', 'linearForward','splineCubicDiscount']='linearZero'):
+    """
+    Bootstrap a USD yield curve using various market instruments.
+    
+    Args:
+        settlementDate: The settlement date for the curve
+        deposit (pd.DataFrame, optional): DataFrame containing deposit rates with 'tenor' and 'rates' columns
+        swap (pd.DataFrame, optional): DataFrame containing swap rates with 'tenor' and 'rates' columns
+        OIS (pd.DataFrame, optional): DataFrame containing OIS rates with 'tenor' and 'rates' columns
+        FRA (pd.DataFrame, optional): DataFrame containing FRA rates with 'tenor' and 'rates' columns
+        method (str): Interpolation method for curve construction. Options:
+            - 'logLinearDiscount': Log-linear discount factor interpolation
+            - 'logCubicDiscount': Log-cubic discount factor interpolation
+            - 'linearZero': Linear zero rate interpolation (default)
+            - 'cubicZero': Cubic zero rate interpolation
+            - 'linearForward': Linear forward rate interpolation
+            - 'splineCubicDiscount': Spline cubic discount factor interpolation
+    
+    Returns:
+        QuantLib yield curve object with USD market conventions (Actual/360 day count)
+    """
     dayCount = ql.Actual360()
 
     helpers = []
@@ -104,6 +124,26 @@ def bootstrap_USD_curve(settlementDate, deposit: pd.DataFrame=None, swap: pd.Dat
     return bootstrap_curve_with_instrument_helpers(settlementDate, helpers, dayCount)
 
 def bootstrap_EUR_curve(settlementDate, deposit: pd.DataFrame=None, swap: pd.DataFrame=None, OIS: pd.DataFrame=None, FRA: pd.DataFrame=None, method: Literal['logLinearDiscount', 'logCubicDiscount','linearZero','cubicZero', 'linearForward','splineCubicDiscount']='linearZero'):
+    """
+    Bootstrap a EUR yield curve using various market instruments.
+    
+    Args:
+        settlementDate: The settlement date for the curve
+        deposit (pd.DataFrame, optional): DataFrame containing deposit rates with 'tenor' and 'rates' columns
+        swap (pd.DataFrame, optional): DataFrame containing swap rates with 'tenor' and 'rates' columns
+        OIS (pd.DataFrame, optional): DataFrame containing OIS rates with 'tenor' and 'rates' columns
+        FRA (pd.DataFrame, optional): DataFrame containing FRA rates with 'tenor' and 'rates' columns
+        method (str): Interpolation method for curve construction. Options:
+            - 'logLinearDiscount': Log-linear discount factor interpolation
+            - 'logCubicDiscount': Log-cubic discount factor interpolation
+            - 'linearZero': Linear zero rate interpolation (default)
+            - 'cubicZero': Cubic zero rate interpolation
+            - 'linearForward': Linear forward rate interpolation
+            - 'splineCubicDiscount': Spline cubic discount factor interpolation
+    
+    Returns:
+        QuantLib yield curve object with EUR market conventions (Actual/360 day count)
+    """
     dayCount = ql.Actual360()
 
     helpers = []
@@ -125,8 +165,27 @@ def bootstrap_EUR_curve(settlementDate, deposit: pd.DataFrame=None, swap: pd.Dat
 
     return bootstrap_curve_with_instrument_helpers(settlementDate, helpers, dayCount)
 
-
 def bootstrap_JPY_curve(settlementDate, deposit: pd.DataFrame=None, swap: pd.DataFrame=None, OIS: pd.DataFrame=None, FRA: pd.DataFrame=None, method: Literal['logLinearDiscount', 'logCubicDiscount','linearZero','cubicZero', 'linearForward','splineCubicDiscount']='linearZero'):
+    """
+    Bootstrap a JPY yield curve using various market instruments.
+    
+    Args:
+        settlementDate: The settlement date for the curve
+        deposit (pd.DataFrame, optional): DataFrame containing deposit rates with 'tenor' and 'rates' columns
+        swap (pd.DataFrame, optional): DataFrame containing swap rates with 'tenor' and 'rates' columns
+        OIS (pd.DataFrame, optional): DataFrame containing OIS rates with 'tenor' and 'rates' columns
+        FRA (pd.DataFrame, optional): DataFrame containing FRA rates with 'tenor' and 'rates' columns
+        method (str): Interpolation method for curve construction. Options:
+            - 'logLinearDiscount': Log-linear discount factor interpolation
+            - 'logCubicDiscount': Log-cubic discount factor interpolation
+            - 'linearZero': Linear zero rate interpolation (default)
+            - 'cubicZero': Cubic zero rate interpolation
+            - 'linearForward': Linear forward rate interpolation
+            - 'splineCubicDiscount': Spline cubic discount factor interpolation
+    
+    Returns:
+        QuantLib yield curve object with JPY market conventions (Actual/360 day count)
+    """
     dayCount = ql.Actual360()
 
     helpers = []
@@ -148,8 +207,27 @@ def bootstrap_JPY_curve(settlementDate, deposit: pd.DataFrame=None, swap: pd.Dat
 
     return bootstrap_curve_with_instrument_helpers(settlementDate, helpers, dayCount)
     
-
 def bootstrap_GBP_curve(settlementDate, deposit: pd.DataFrame=None, swap: pd.DataFrame=None, OIS: pd.DataFrame=None, FRA: pd.DataFrame=None, method: Literal['logLinearDiscount', 'logCubicDiscount','linearZero','cubicZero', 'linearForward','splineCubicDiscount']='linearZero'):
+    """
+    Bootstrap a GBP yield curve using various market instruments.
+    
+    Args:
+        settlementDate: The settlement date for the curve
+        deposit (pd.DataFrame, optional): DataFrame containing deposit rates with 'tenor' and 'rates' columns
+        swap (pd.DataFrame, optional): DataFrame containing swap rates with 'tenor' and 'rates' columns
+        OIS (pd.DataFrame, optional): DataFrame containing OIS rates with 'tenor' and 'rates' columns
+        FRA (pd.DataFrame, optional): DataFrame containing FRA rates with 'tenor' and 'rates' columns
+        method (str): Interpolation method for curve construction. Options:
+            - 'logLinearDiscount': Log-linear discount factor interpolation
+            - 'logCubicDiscount': Log-cubic discount factor interpolation
+            - 'linearZero': Linear zero rate interpolation (default)
+            - 'cubicZero': Cubic zero rate interpolation
+            - 'linearForward': Linear forward rate interpolation
+            - 'splineCubicDiscount': Spline cubic discount factor interpolation
+    
+    Returns:
+        QuantLib yield curve object with GBP market conventions (Actual/360 day count)
+    """
     dayCount = ql.Actual360()
 
     helpers = []
@@ -172,6 +250,27 @@ def bootstrap_GBP_curve(settlementDate, deposit: pd.DataFrame=None, swap: pd.Dat
     return bootstrap_curve_with_instrument_helpers(settlementDate, helpers, dayCount)
 
 def bootstrap_TWD_curve(settlementDate, deposit: pd.DataFrame=None, swap: pd.DataFrame=None, method: Literal['logLinearDiscount', 'logCubicDiscount','linearZero','cubicZero', 'linearForward','splineCubicDiscount']='linearZero'):
+    """
+    Bootstrap a TWD yield curve using various market instruments.
+    
+    Args:
+        settlementDate: The settlement date for the curve
+        deposit (pd.DataFrame, optional): DataFrame containing deposit rates with 'tenor' and 'rates' columns
+        swap (pd.DataFrame, optional): DataFrame containing swap rates with 'tenor' and 'rates' columns
+        method (str): Interpolation method for curve construction. Options:
+            - 'logLinearDiscount': Log-linear discount factor interpolation
+            - 'logCubicDiscount': Log-cubic discount factor interpolation
+            - 'linearZero': Linear zero rate interpolation (default)
+            - 'cubicZero': Cubic zero rate interpolation
+            - 'linearForward': Linear forward rate interpolation
+            - 'splineCubicDiscount': Spline cubic discount factor interpolation
+    
+    Returns:
+        QuantLib yield curve object with TWD market conventions (Actual/365Fixed day count)
+    
+    Note:
+        TWD curve does not support OIS and FRA instruments in this implementation.
+    """
     dayCount = ql.Actual365Fixed()
 
     helpers = []
@@ -184,7 +283,7 @@ def bootstrap_TWD_curve(settlementDate, deposit: pd.DataFrame=None, swap: pd.Dat
         helpers+=swap_helpers
     
     return bootstrap_curve_with_instrument_helpers(settlementDate, helpers, dayCount)
-    
+
 
 if __name__ == '__main__':
         

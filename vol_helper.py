@@ -4,6 +4,36 @@ from conventions import Conventions
 
 
 def create_black_vol_curve(vol_curve: pd.Series, reference_date:ql.Date, dayCount:ql.DayCounter=ql.Business252()):
+    """
+    Create a QuantLib BlackVarianceCurve from a pandas Series containing volatility data.
+    
+    This function constructs a Black volatility curve used for pricing options and other
+    derivatives by creating a BlackVarianceCurve object with the specified volatility data
+    and expiration dates.
+    
+    Parameters
+    ----------
+    vol_curve : pandas.Series
+        Series containing volatility data where:
+        - Index represents option tenors/expirations (str format like '1M', '3M', '1Y')
+        - Values are implied volatilities (float values)
+    reference_date : QuantLib.Date
+        Reference date for the volatility curve (typically the valuation date)
+    dayCount : QuantLib.DayCounter, optional
+        Day count convention for time calculations (default: QuantLib.Business252())
+    
+    Returns
+    -------
+    QuantLib.BlackVarianceCurve
+        Configured BlackVarianceCurve with extrapolation enabled for pricing derivatives
+        
+    Notes
+    -----
+    - The function automatically enables extrapolation on the volatility curve
+    - Index values in the Series are converted to QuantLib.Period objects
+    - This curve can be used with various QuantLib pricing engines for option valuation
+    - The curve represents term structure of volatility for a single underlying asset
+    """
 
 
     expirations = [reference_date+ql.Period(tenor) for tenor in vol_curve.index]
@@ -15,6 +45,41 @@ def create_black_vol_curve(vol_curve: pd.Series, reference_date:ql.Date, dayCoun
     return volatilityCurve
 
 def create_black_vol_surface(df: pd.DataFrame, reference_date:ql.Date, dayCount:ql.DayCounter=ql.Actual365Fixed(), calendar=ql.WeekendsOnly()):
+    """
+    Create a QuantLib BlackVarianceSurface from a DataFrame containing volatility data.
+    
+    This function constructs a Black volatility surface used for pricing options and other
+    derivatives by creating a BlackVarianceSurface object with the specified volatility matrix,
+    strikes, and expiration dates.
+    
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        DataFrame containing volatility data where:
+        - Index represents strike prices (float values)
+        - Columns represent option tenors/expirations (str format like '1M', '3M', '1Y')
+        - Values are implied volatilities (float values)
+    reference_date : QuantLib.Date
+        Reference date for the volatility surface (typically the valuation date)
+    dayCount : QuantLib.DayCounter, optional
+        Day count convention for time calculations (default: QuantLib.Actual365Fixed())
+    calendar : QuantLib.Calendar, optional
+        Calendar for business day adjustments (default: QuantLib.WeekendsOnly())
+    
+    Returns
+    -------
+    QuantLib.BlackVarianceSurface
+        Configured BlackVarianceSurface with extrapolation enabled for pricing derivatives
+        
+    Notes
+    -----
+    - The function automatically enables extrapolation on the volatility surface
+    - Column names in the DataFrame are converted to QuantLib.Period objects
+    - The volatility matrix is constructed with strikes as rows and expirations as columns
+    - This surface can be used with various QuantLib pricing engines for option valuation
+
+
+    """
     
     expirations = [reference_date+ql.Period(tenor) for tenor in df.columns]
     strikes = list(df.index)
@@ -26,10 +91,42 @@ def create_black_vol_surface(df: pd.DataFrame, reference_date:ql.Date, dayCount:
     volatilitySurface.enableExtrapolation()
     return volatilitySurface
 
-def create_heston_model_helper(df: pd.DataFrame, spot:float,yield_curve, dividend_curve, calendar=ql.NullCalendar(),engine=None):
+def create_heston_model_helper(df: pd.DataFrame, spot:float, yield_curve, dividend_curve, calendar=ql.NullCalendar(), engine=None):
     """
-    Create a list of QuantLib HestonModelHelper objects from a DataFrame.
-    df: columns:option tenor:str, strike:float, vol:float, 
+    Create a list of QuantLib HestonModelHelper objects from a DataFrame containing option market data.
+    
+    This function constructs Heston model helpers used for calibrating the Heston stochastic volatility model
+    by creating HestonModelHelper objects with the specified option market data and underlying parameters.
+    
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        DataFrame containing option market data with required columns:
+        - 'option_tenor': str, time to option expiry (e.g., '1M', '3M', '6M')
+        - 'strike': float, strike price of the option
+        - 'vol': float, implied volatility of the option
+    spot : float
+        Current spot price of the underlying asset
+    yield_curve : QuantLib.YieldTermStructure
+        Risk-free yield curve used for discounting
+    dividend_curve : QuantLib.YieldTermStructure
+        Dividend yield curve for the underlying asset
+    calendar : QuantLib.Calendar, optional
+        Calendar for date calculations (default: QuantLib.NullCalendar())
+    engine : QuantLib.PricingEngine, optional
+        Pricing engine to be set on each helper (default: None)
+    
+    Returns
+    -------
+    list of QuantLib.HestonModelHelper
+        List of configured HestonModelHelper objects ready for Heston model calibration
+        
+    Notes
+    -----
+    - The helpers are typically used in Heston model calibration procedures
+    - If a pricing engine is provided, it will be set on each helper for valuation
+    - The function converts string tenors to QuantLib.Period objects automatically
+    - Volatilities are wrapped in QuantLib.QuoteHandle objects for the helpers
     
     """
     yield_curve_handler = ql.YieldTermStructureHandle(yield_curve)
@@ -50,6 +147,46 @@ def create_heston_model_helper(df: pd.DataFrame, spot:float,yield_curve, dividen
 
 
 def create_swaption_helper(df, curve, engine=None, fixed_leg_conventions=None, floating_leg_conventions=None):
+    """
+    Create a list of QuantLib SwaptionHelper objects from a DataFrame containing swaption market data.
+    
+    This function constructs swaption helpers used for calibrating interest rate models by creating
+    SwaptionHelper objects with the specified market data and conventions.
+    
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        DataFrame containing swaption market data with required columns:
+        - 'maturity': str, time to swaption expiry (e.g., '2Y', '5Y')
+        - 'length': str, length of underlying swap (e.g., '5Y', '10Y') 
+        - 'volatility': float, implied volatility of the swaption
+    curve : QuantLib.YieldTermStructure
+        Yield curve used for discounting and forward rate calculation
+    engine : QuantLib.PricingEngine, optional
+        Pricing engine to be set on each swaption helper (default: None)
+    fixed_leg_conventions : dict, optional
+        Dictionary containing fixed leg conventions. If None, uses US fixed leg conventions.
+        Expected keys: 'tenor', 'dayCount'
+    floating_leg_conventions : dict, optional
+        Dictionary containing floating leg conventions. If None, uses US floating leg conventions.
+        Expected keys: 'frequency', 'dayCount', 'date_rolling_convention', 'settlement_days',
+        'endOfMonth', 'calendar', 'currency'
+    
+    Returns
+    -------
+    list of QuantLib.SwaptionHelper
+        List of configured SwaptionHelper objects ready for model calibration
+        
+    Notes
+    -----
+    - If conventions are not provided, US market conventions are used as defaults
+    - The function creates an IborIndex for the floating leg using the provided conventions
+    - Each helper can optionally have a pricing engine set for valuation
+    - The helpers are typically used in interest rate model calibration procedures
+
+    """
+
+
     if fixed_leg_conventions is None:
         fixed_leg_conventions = Conventions.USFixedLegConventions()
     if floating_leg_conventions is None:
@@ -122,7 +259,66 @@ def create_TWD_swaption_helpers(df: pd.DataFrame, curve, engine=None):
     fixed_leg_conventions['tenor'] = ql.Period('1Y')
     floating_leg_conventions = Conventions.TWDFloatingLegConventions()
     return create_swaption_helper(df, curve, engine, fixed_leg_conventions, floating_leg_conventions)
+
+def create_swap_helper_for_currency(df: pd.DataFrame, curve, engine=None, currency='USD'):
+    """
+    Create currency-specific swap rate helpers using predefined market conventions.
     
+    This factory function creates swap rate helpers for different currencies by delegating
+    to the appropriate currency-specific helper function with predefined market conventions.
+    
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        DataFrame containing swaption market data with required columns:
+        - 'maturity': str, time to swaption expiry (e.g., '2Y', '5Y')
+        - 'length': str, length of underlying swap (e.g., '5Y', '10Y') 
+        - 'volatility': float, implied volatility of the swaption
+    curve : QuantLib.YieldTermStructure
+        Yield curve used for discounting and forward rate calculation
+    engine : QuantLib.PricingEngine, optional
+        Pricing engine to be set on each swap helper (default: None)
+    currency : str, optional
+        Currency code for market conventions (default: 'USD')
+        Supported currencies: 'USD', 'EUR', 'JPY', 'GBP', 'CHF', 'TWD'
+    
+    Returns
+    -------
+    list of QuantLib.SwapRateHelper
+        List of configured SwapRateHelper objects with currency-specific conventions
+        
+    Raises
+    ------
+    ValueError
+        If the specified currency is not supported
+        
+    Notes
+    -----
+    - Each currency uses predefined market conventions for fixed and floating legs
+    - The function automatically applies appropriate day count conventions, frequencies,
+      and calendar settings for each currency
+    - This is a convenience function that eliminates the need to manually specify
+      conventions for standard currency markets
+
+
+    """
+    if currency == 'USD':
+        return create_USD_swaption_helpers(df, curve, engine)
+    elif currency == 'EUR':
+        return create_EUR_swaption_helpers(df, curve, engine)
+    elif currency == 'JPY':
+        return create_JPY_swaption_helpers(df, curve, engine)
+    elif currency == 'GBP':
+        return create_GBP_swaption_helpers(df, curve, engine)
+    elif currency == 'CHF':
+        return create_CHF_swaption_helpers(df, curve, engine)
+    elif currency == 'TWD':
+        return create_TWD_swaption_helpers(df, curve, engine)
+    else:
+        raise ValueError(f'Unsupported currency: {currency}')
+    
+
+
 if __name__ == '__main__':
 
 

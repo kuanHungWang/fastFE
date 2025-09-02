@@ -28,13 +28,13 @@ date = today + ql.Period("6M")
 #@Description
 """A specific date"""
 #@code
-date = ql.Date(1, 1, 2025)
+date = ql.Date(1, 1, 2025) # date format is day, month, year
 
 #@Description
 """create a schedule from start date to termination date and frequency"""
 #@code
 startDate = ql.Date().todaysDate()
-terminationDate = startDate + ql.Period(3, ql.Years)
+terminationDate = startDate + ql.Period(3, ql.Years)  # startDate + 3y
 frequency = ql.Period(ql.Quarterly)
 schedule = ql.MakeSchedule(startDate, terminationDate, frequency)
 
@@ -163,7 +163,7 @@ create_JPY_FRA_helpers(df_fra)
 
 
 #@Description
-"""Build curve from helpers."""
+"""Build curve from helpers. Recommend to use quick curve builder unless currency is not supported"""
 #@code
 today = ql.Date().todaysDate()
 df_deposit = pd.DataFrame({'tenor': ['1M', '2M', '3M', '6M', '9M'], 'rates': [0.015, 0.018, 0.02, 0.022, 0.025]})
@@ -176,7 +176,7 @@ curve = bootstrap_curve_with_instrument_helpers(today, deposit_helpers + swap_he
 
 
 #@Description
-"""Build curve from  market data dataFrame"""
+"""Build curve from  market data dataFrame. Recommend to use quick curve builder unless currency is not supported"""
 #@code
 from conventions import Conventions
 today = ql.Date().todaysDate()
@@ -192,7 +192,7 @@ curve = bootstrap_curve(
 
 #@Description
 """Build curve from market data dataFrame for specific currency witout need to pass conventions, which is the easiest way to build curve
-keywords: USD curve, EUR curve, JPY curve, GBP curve, TWD curve, quick curve builder
+keywords: USD curve, EUR curve, JPY curve, GBP curve, TWD curve, quick curve builder, recommended curve builder
 """
 #@code
 curve = bootstrap_USD_curve(today, deposit=df_deposit, swap=df_swap)  # fast builder for USD curve without conventions
@@ -232,6 +232,7 @@ model = ql.HullWhite(term_structure);
 engine = ql.JamshidianSwaptionEngine(model)
 
 # note: engine is not necessary to create swaption helpers, but you need to set egine to each helper before calibrate the model.
+# The following is more recommended way to create swaption helpers unless currency is not supported.
 swaption_helpers = create_swaption_helper(df_swaption, curve, engine, fixed_leg_conventions, floating_leg_conventions)
 swaption_helpers = create_USD_swaption_helpers(df_swaption, curve, engine)  # fast builder for USD swaption without conventions
 swaption_helpers = create_EUR_swaption_helpers(df_swaption, curve, engine)  # fast builder for EUR swaption without conventions
@@ -271,22 +272,34 @@ spot = 100
 riskFreeCurve = ql.FlatForward(today, 0.04, dayCount)  # Usually don't use flat curve in real world, just simplify for example.
 dividendCurve = ql.FlatForward(today, 0.01, dayCount)  # Usually don't use flat curve in real world, just simplify for example.
 black_vol_df = pd.Series([0.015, 0.018, 0.02, 0.022, 0.025], index=['1M', '2M', '3M', '6M', '9M'])
-
-# constant volatility
+# There are 3 types of volatility that BlackScholesMertonModel can use:
+# 1. constant volatility
 const_vol = ql.BlackConstantVol(today, calendar, 0.02, dayCount)
 black_model_const_vol = BlackScholesMertonModel(riskFreeCurve, dividendCurve, const_vol, spot)
-# volatility curve
+# 2. volatility curve
 vol_curve = create_black_vol_curve(black_vol_df, today)
 black_model_vol_curve = BlackScholesMertonModel(riskFreeCurve, dividendCurve, vol_curve, spot)
 
-# volatility surface, also known as local volatility
+# 3. volatility surface, also known as local volatility
 df_vol_surface = get_volatility_surface('AAPL', ['1M', '2M', '3M', '6M', '9M'], [100, 110, 120, 130, 140])
 vol_surface = create_black_vol_surface(df_vol_surface, today)
 black_model_vol_surface = BlackScholesMertonModel(riskFreeCurve, dividendCurve, vol_surface, spot)
 
 fixingSchedule = ql.Schedule(today, today + ql.Period('1Y'), ql.Period('1M'), calendar, ql.Following, ql.Following, ql.DateGeneration.Backward, False)
 paths = black_model_vol_curve.monte_carlo_paths(fixingSchedule, 4)
-
+"""       
+Parameters of monte_carlo_paths function:
+fixingSchedule : ql.Schedule
+    Schedule of dates for which to generate simulated values
+numPaths : int
+    Number of Monte Carlo paths to simulate
+    
+Returns
+pandas.DataFrame
+    DataFrame containing the simulated paths. The index consists of the dates from the
+    fixing schedule, and each column represents one simulation path.
+    Shape: (len(fixingSchedule), numPaths)
+"""
 
 
 #@Description
@@ -310,7 +323,12 @@ heston_model = HestonModel(riskFreeCurve, dividendCurve, calendar)
 heston_model.calibrate(heston_vol_df, spot)
 fixingSchedule = ql.Schedule(today, today + ql.Period('1Y'), ql.Period('1M'), calendar, ql.Following, ql.Following, ql.DateGeneration.Backward, False)
 paths = heston_model.monte_carlo_paths(fixingSchedule, 4)
-
+"""
+Parameters of monte_carlo_paths function:
+fixingSchedule: fixing schedule
+numPaths: number of paths
+Returns: DataFrame with index as fixing dates, columns as paths
+"""
 
 #@Description
 """Garman-Kohlagen FX Model
@@ -325,16 +343,17 @@ spot = 1.3
 domestic_curve = ql.FlatForward(today, 0.04, dayCount) # Usually don't use flat curve in real world, just simplify for example.
 foreign_curve = ql.FlatForward(today, 0.05, dayCount) # Usually don't use flat curve in real world, just simplify for example.
 
-# constant volatility
+# There are 3 types of volatility that GarmanKohlagenProcessModel can use:
+# 1. constant volatility
 const_vol = ql.BlackConstantVol(today, calendar, 0.2, dayCount) # Usually don't use flat curve in real world, just simplify for example.
 fxModel = GarmanKohlagenProcessModel(foreign_curve, domestic_curve, const_vol, spot)
 
-# volatility curve
+# 2. volatility curve
 black_vol_df = pd.Series([0.015, 0.018, 0.02, 0.022, 0.025], index=['1M', '2M', '3M', '6M', '9M'])
 vol_curve = create_black_vol_curve(black_vol_df, today)
 fxModel = GarmanKohlagenProcessModel(foreign_curve, domestic_curve, vol_curve, spot)
 
-# volatility surface, also known as local volatility
+# 3. volatility surface, also known as local volatility
 df_vol_surface = get_volatility_surface('AAPL', ['1M', '2M', '3M', '6M', '9M'], [100, 110, 120, 130, 140])
 vol_surface = create_black_vol_surface(df_vol_surface, today)
 fxModel = GarmanKohlagenProcessModel(foreign_curve, domestic_curve, vol_surface, spot)
@@ -343,7 +362,22 @@ fxModel = GarmanKohlagenProcessModel(foreign_curve, domestic_curve, vol_surface,
 
 fixingSchedule = ql.Schedule(today, today + ql.Period('1Y'), ql.Period('1M'), calendar, ql.Following, ql.Following, ql.DateGeneration.Backward, False)
 paths = fxModel.monte_carlo_paths(fixingSchedule, 4)
-print(paths)
+"""       
+Parameters of monte_carlo_paths function:
+fixingSchedule : ql.Schedule
+    Schedule of dates for which to generate simulated values
+numPaths : int
+    Number of Monte Carlo paths to simulate
+Returns
+pandas.DataFrame
+    DataFrame containing the simulated paths. The index consists of the dates from the
+    fixing schedule, and each column represents one simulation path.
+    Shape: (len(fixingSchedule), numPaths)
+"""
+
+
+
+
 
 #@Description
 """Multi-Asset Model
@@ -360,6 +394,20 @@ processes = [black_model_vol_curve.process, fxModel.process]  # note: don't supp
 multiAssetModel = MultiAssetModel(processes, corrMatrix)
 fixingSchedule = ql.Schedule(today, today + ql.Period('1Y'), ql.Period('1M'), calendar, ql.Following, ql.Following, ql.DateGeneration.Backward, False)
 paths = multiAssetModel.monte_carlo_paths(fixingSchedule, 4)
+"""
+Parameters of monte_carlo_paths function:
+fixingSchedule : ql.Schedule
+    Schedule of dates for which to generate simulated values
+numPaths : int
+    Number of Monte Carlo paths to simulate
+dayCount : ql.DayCounter
+    Day counter for the fixing schedule
+
+Returns
+list of pandas.DataFrame
+    List of DataFrames containing the simulated paths. Each DataFrame has the fixing schedule as index and columns as paths.
+"""
+
 
 #@Description
 """Get Volatility Surface (utility)
@@ -390,6 +438,20 @@ payoff = lambda fixing: np.maximum(fixing - 1, 0)
 exercise_schedule = pd.Series(np.ones(len(paymentSchedule), dtype=bool), index=paymentSchedule)
 exercise_schedule.iloc[0] = False
 ls = LongstaffSchwartz(cashflows, discountFactor, exercise_schedule, payoff, fixing)
+"""
+init arguement of LongstaffSchwartz:
+cashflows : pd.DataFrame
+    The net cashflows of a financial contract before applying discounting and early exercise (index: time, columns: path)
+discountFactors : pd.DataFrame
+    Discount factor for one time period (from t to t-1), not discount to t0, for interest rate model, it has multiple column like cashflow, otherwise, if using deterministic discounting, it has only one column.
+exercise_schedule : pd.Series|List
+    The early exercise schedule, single column value, for panda series, index must the same as cashflows, and dtype is bool, representing exercisable or not.
+exercise_payoff : Callable|np.ndarray|pd.DataFrame
+    The payoff of early exercise, if callable, it takes fixing as input, if numpy array or pandas dataframe, it must have the same shape as cashflows.
+observable : pd.DataFrame
+    The observable for least sqaure error estimation for early exercise, usually the fixing values of underling value.
+"""
+
 ls.backward_induction()  # conduct backward induction for optimized exercise decision
 ls.valuations() # return expected npv, i.e. valuation
 ls.confidence_interval(alpha=0.05) # return confidence interval of the expected npv
