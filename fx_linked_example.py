@@ -3,8 +3,7 @@ import numpy as np
 import pandas as pd
 from util import year_fraction
 from curve_builder import (
-    bootstrap_USD_curve,
-    bootstrap_EUR_curve
+    bootstrap_curve,
 )
 from vol_helper import create_black_vol_surface
 from models import GarmanKohlagenProcessModel
@@ -52,11 +51,11 @@ print(f' settlement date: {settlementDate}')
 
 eur_deposit = get_deposit(['1M', '2M', '3M', '6M', '9M'])
 eur_swap = get_swap(['1Y', '2Y', '5Y', '7Y', '10Y', '15Y', '20Y', '25Y', '30Y'])
-eur_yieldCurve = bootstrap_EUR_curve(today, deposit=eur_deposit, swap=eur_swap)
+eur_yieldCurve = bootstrap_curve('EUR', today, deposit=eur_deposit, swap=eur_swap)
 
 usd_deposit = get_deposit(['1M', '2M', '3M', '6M', '9M'])
 usd_swap = get_swap(['1Y', '2Y', '5Y', '7Y', '10Y', '15Y', '20Y', '25Y', '30Y'])
-usd_yieldCurve = bootstrap_USD_curve(today, deposit=usd_deposit, swap=usd_swap)
+usd_yieldCurve = bootstrap_curve('USD', today, deposit=usd_deposit, swap=usd_swap)
 
 eurusd_vol = get_volatility_surface('EUR', ['1M', '2M', '3M', '6M', '9M', '12M'], [1.05, 1.07, 1.09, 1.11, 1.13, 1.15])
 vol_surface = create_black_vol_surface(eurusd_vol, today)

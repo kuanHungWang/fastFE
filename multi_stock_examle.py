@@ -6,7 +6,7 @@ from util import (
     year_fraction,
     combine_schedule
 )
-from curve_builder import bootstrap_USD_curve
+from curve_builder import bootstrap_curve
 from vol_helper import create_black_vol_surface
 from models import (
     BlackScholesMertonModel,
@@ -69,7 +69,7 @@ print(f' settlement date: {settlementDate}')
 # prepare market data for curve and model calibration
 df_deposit = get_deposit(['1M', '2M', '3M', '6M', '9M'])
 df_swap = get_swap(['1Y', '2Y', '5Y', '7Y', '10Y', '15Y', '20Y', '25Y', '30Y'])
-riskFreeCurve = bootstrap_USD_curve(today, deposit=df_deposit, swap=df_swap)
+riskFreeCurve = bootstrap_curve('USD', today, deposit=df_deposit, swap=df_swap)
 
 spot_AAPL = get_price('AAPL')
 dividend_rate_AAPL = get_dividend_rate('AAPL')

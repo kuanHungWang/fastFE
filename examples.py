@@ -4,7 +4,7 @@ import QuantLib as ql
 from util import *
 from conventions import Conventions
 from rate_helpers import *
-from curve_builder import bootstrap_USD_curve, bootstrap_EUR_curve, bootstrap_JPY_curve, bootstrap_GBP_curve, bootstrap_TWD_curve, bootstrap_curve_with_instrument_helpers, bootstrap_curve
+from curve_builder import bootstrap_curve, bootstrap_USD_curve, bootstrap_EUR_curve, bootstrap_JPY_curve, bootstrap_GBP_curve, bootstrap_TWD_curve, bootstrap_curve_with_instrument_helpers
 from vol_helper import *
 from leastSquareError import LongstaffSchwartz
 from models import HullWhiteModel, HestonModel, MultiAssetModel, BlackScholesMertonModel, GarmanKohlagenProcessModel
@@ -176,30 +176,14 @@ curve = bootstrap_curve_with_instrument_helpers(today, deposit_helpers + swap_he
 
 
 #@Description
-"""Build curve from  market data dataFrame. Recommend to use quick curve builder unless currency is not supported"""
-#@code
-from conventions import Conventions
-today = ql.Date().todaysDate()
-
-df_deposit = pd.DataFrame({'tenor': ['1M', '2M', '3M', '6M', '9M'], 'rates': [0.015, 0.018, 0.02, 0.022, 0.025]})
-df_swap = pd.DataFrame({'rate': [0.015, 0.018, 0.02, 0.022, 0.025],'tenor': ['1Y', '2Y', '5Y', '7Y', '10Y']})
-curve = bootstrap_curve(
-    today, ql.Actual360(), 
-    deposit=(df_deposit, Conventions.USFixedLegConventions()), 
-    swap=(df_swap, Conventions.USFixedLegConventions(), 
-    Conventions.USFloatingLegConventions())
-    )
-
-#@Description
 """Build curve from market data dataFrame for specific currency witout need to pass conventions, which is the easiest way to build curve
 keywords: USD curve, EUR curve, JPY curve, GBP curve, TWD curve, quick curve builder, recommended curve builder
 """
 #@code
-curve = bootstrap_USD_curve(today, deposit=df_deposit, swap=df_swap)  # fast builder for USD curve without conventions
-curve = bootstrap_EUR_curve(today, deposit=df_deposit, swap=df_swap)  # fast builder for EUR curve without conventions
-curve = bootstrap_JPY_curve(today, deposit=df_deposit, swap=df_swap)  # fast builder for JPY curve without conventions
-curve = bootstrap_GBP_curve(today, deposit=df_deposit, swap=df_swap)  # fast builder for GBP curve without conventions
-curve = bootstrap_TWD_curve(today, deposit=df_deposit, swap=df_swap)  # fast builder for TWD curve without conventions
+today = ql.Date().todaysDate()
+df_deposit = pd.DataFrame({'tenor': ['1M', '2M', '3M', '6M', '9M'], 'rates': [0.015, 0.018, 0.02, 0.022, 0.025]})
+df_swap = pd.DataFrame({'rate': [0.015, 0.018, 0.02, 0.022, 0.025],'tenor': ['1Y', '2Y', '5Y', '7Y', '10Y']})
+curve = bootstrap_curve('USD', today, deposit=df_deposit, swap=df_swap)
 
 
 

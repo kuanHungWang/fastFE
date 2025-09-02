@@ -7,7 +7,7 @@ from util import (
     year_fraction,
     combine_schedule
 )
-from curve_builder import bootstrap_USD_curve
+from curve_builder import bootstrap_USD_curve, bootstrap_curve
 from leastSquareError import LongstaffSchwartz
 from models import HullWhiteModel
 from market_data import (
@@ -58,7 +58,7 @@ df_swaption = get_swaption(['2Y', '3Y'], ['5Y', '5Y'])
 
 
 # Step 3. Create curve and model
-curve = bootstrap_USD_curve(today, deposit=df_deposit, swap=df_swap)
+curve = bootstrap_curve('USD', today, deposit=df_deposit, swap=df_swap)
 hw_model = HullWhiteModel(today, curve, 'USD')
 hw_model.calibrate(df_swaption)
 
@@ -111,8 +111,6 @@ print(f'floating_cashflows: \n{floating_cashflows}')
 # Reindex both cashflow with paymentSchedule to calculate net cashflow in correct periods.
 fixed_cashflows = fixed_cashflows.reindex(paymentSchedule).fillna(0)
 floating_cashflows = floating_cashflows.reindex(paymentSchedule).fillna(0)
-print(f'\nfixed_cashflows: \n{fixed_cashflows}')
-print(f'\nfloating_cashflows: \n{floating_cashflows}')
 net_cashflows = pd.DataFrame(fixed_cashflows.values - floating_cashflows.values, index=paymentSchedule)  # use .values to broadcast.
 print(f'\nnet cashflows: \n{net_cashflows}')
 

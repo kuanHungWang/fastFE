@@ -7,7 +7,7 @@ from util import (
     year_fraction,
     combine_schedule
 )
-from curve_builder import bootstrap_USD_curve
+from curve_builder import  bootstrap_curve
 from leastSquareError import LongstaffSchwartz
 from models import HullWhiteModel
 from market_data import (
@@ -59,7 +59,7 @@ df_swaption = get_swaption(['2Y', '3Y'], ['5Y', '5Y'])
 
 
 # create curve and calibrate model by swaptions
-curve = bootstrap_USD_curve(today, deposit=df_deposit, swap=df_swap)
+curve = bootstrap_curve('USD', today, deposit=df_deposit, swap=df_swap)
 hw_model = HullWhiteModel(today, curve, 'USD')
 hw_model.calibrate(df_swaption)
 

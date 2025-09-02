@@ -6,7 +6,7 @@ from util import (
     year_fraction,
     combine_schedule
 )
-from curve_builder import bootstrap_USD_curve
+from curve_builder import bootstrap_curve
 from leastSquareError import LongstaffSchwartz
 from models import HullWhiteModel
 
@@ -63,7 +63,7 @@ df_swaption = pd.DataFrame({
     'volatility': [0.13, 0.21, 0.12, 0.14, 0.13, 0.07, 0.06, 0.05]
 })
 
-curve = bootstrap_USD_curve(today, deposit=df_deposit, swap=df_swap)
+curve = bootstrap_curve('USD', today, deposit=df_deposit, swap=df_swap)
 print(dayCount.yearFraction(settlementDate, curve.maxDate()))
 hw_model = HullWhiteModel(today, curve, 'USD')
 hw_model.calibrate(df_swaption)

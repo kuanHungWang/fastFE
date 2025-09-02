@@ -5,7 +5,7 @@ from util import (
     get_nearest_fixing_date,
     year_fraction
 )
-from curve_builder import bootstrap_USD_curve
+from curve_builder import bootstrap_curve
 from models import HestonModel
 from market_data import (
     get_deposit,
@@ -68,7 +68,7 @@ df_heston_vol = pd.DataFrame({
 }) 
 
 # create curve and calibrate model by swaptions
-yieldCurve = bootstrap_USD_curve(today, deposit=df_deposit, swap=df_swap)
+yieldCurve = bootstrap_curve('USD', today, deposit=df_deposit, swap=df_swap)
 
 spot = get_price('AAPL')
 dividend_rate = get_dividend_rate('AAPL')

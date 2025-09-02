@@ -15,7 +15,7 @@ from rate_helpers import (
 from curve_builder import bootstrap_USD_curve, bootstrap_EUR_curve, bootstrap_JPY_curve, bootstrap_GBP_curve, bootstrap_TWD_curve
 from conventions import Conventions
 from typing import Literal, Tuple
-from curve_builder import bootstrap_curve_with_instrument_helpers, bootstrap_curve
+from curve_builder import bootstrap_curve_with_instrument_helpers
 from vol_helper import (
     create_USD_swaption_helpers, create_EUR_swaption_helpers,
     create_JPY_swaption_helpers, create_GBP_swaption_helpers,
