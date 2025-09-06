@@ -17,15 +17,24 @@ from market_data import (
 )
 
 # An example of interest rate linked product using Hull White model and monte carlo simulation to calculate fair value.
+# Product term sheet:
+# 5Y-2Y CMS spread cancellable IRS(libor floating leg)
+# rec spread of 5Y-2Y CMS, 30/360, frequency 1Y, fixing-in-advance(2 business days before payment date)
+# pay 6M Libor, act/360, frequency 6M, fixing-in-advance(2 business days before payment date)
+# cancelable schedule: starting from year 2, yearly by cms spread receiver. (you are the option buyer)
 
-# Step 1. Set up parameters
+
+
+# Step 1. Set up parameters, including contract parameters, market conventions such as day count, date rolling convention, etc.
 # contract parameters
 fixed_rate = 0.018
 notional = 1_000_000
 fixing_in_advance = True
-tenor = 3
+tenor = 4
 pay_frequency = '6M'
 rec_frequency = '1Y'
+cancel_frequency = '1Y'
+non_call_period = '2y'
 
 # number of paths for monte carlo simulation
 n_path = 6
@@ -48,7 +57,8 @@ ql.Settings.instance().evaluationDate = today
 print(f' trade date: {today}')
 print(f' settlement date: {settlementDate}')
 
-# Step 2. Prepare market data
+# Step 2. Prepare market data, including data to bootstrap curve and data to calibrate model.
+# For this example, we use deposit and swap data to bootstrap curve, and swaption data to calibrate Hull White model.
 # Market data to bootstrap curve.
 df_deposit = get_deposit(['1M', '2M', '3M', '6M', '9M'])
 df_swap = get_swap(['1Y', '2Y', '5Y', '7Y', '10Y', '15Y', '20Y', '25Y', '30Y'])
@@ -57,69 +67,117 @@ df_swap = get_swap(['1Y', '2Y', '5Y', '7Y', '10Y', '15Y', '20Y', '25Y', '30Y'])
 df_swaption = get_swaption(['2Y', '3Y'], ['5Y', '5Y'])
 
 
-# Step 3. Create curve and model
+# Step 3. Create curve and model, use previously created market data as input and calibration data.
 curve = bootstrap_curve('USD', today, deposit=df_deposit, swap=df_swap)
 hw_model = HullWhiteModel(today, curve, 'USD')
 hw_model.calibrate(df_swaption)
 
 # Step 4. Create Schedules
-# Create payment schedules for fixed leg and floating leg, and fixing schedule of floating leg(2 business days before payment date)
+# For structured product, typically we need to create payment schedule and fixing schedule. For payment schedule, create multiple ones if needed for different legs, but always merge to one schedule.
+# In this example:  
+# For payment schedule, we need to create two schedules for fixed leg(yearly) and floating leg(semi-annual).
+# For fixing schedule, we need to create a schedule which is 2 business days before payment date.
+
 terminationDate = calendar.advance(settlementDate, ql.Period(tenor, ql.Years))
 endOfMonth = calendar.isEndOfMonth(terminationDate)
 paySchedule = ql.Schedule(settlementDate, terminationDate, pay_frequency, calendar, date_rolling_convention, date_termination_convention, rule, endOfMonth)
 recSchedule = ql.Schedule(settlementDate, terminationDate, rec_frequency, calendar, date_rolling_convention, date_termination_convention, rule, endOfMonth)
 # Note: the schedule created by ql.Schedule include settlement date, this behavior cowork with year_fraction() which always has 0 in first value.
 paymentSchedule = combine_schedule(paySchedule, recSchedule)  # merge two schedules
+
+
 fixingSchedule = [calendar.advance(d, ql.Period(-2, ql.Days)) for d in paySchedule]  # fixing schedule(2 business days before payment date)
 # convert original quantlib schedule object to list to use in pandas index.
 paySchedule = [d for d in paySchedule]
 recSchedule = [d for d in recSchedule]
+cancel_start_date = calendar.advance(settlementDate, ql.Period(non_call_period))
+cancel_frequency = ql.Period(cancel_frequency)
+cancelSchedule = ql.Schedule(cancel_start_date, terminationDate, cancel_frequency, calendar, date_rolling_convention, date_termination_convention, rule, endOfMonth)
+cancelSchedule = [d for d in cancelSchedule][: -1]  
+print(f'recSchedule: {recSchedule}')
+print(f'paySchedule: {paySchedule}')
+print(f'paymentSchedule: {paymentSchedule}')
+print(f'fixingSchedule: {fixingSchedule}')
+print(f'cancelSchedule: {cancelSchedule}')
 # Notes: no need to convert ql.Date to pd.Timestamp, because pd.DataFrame can handle ql.Date as index.
 
 
-# Step 5. Generate Cashflows based on monte carlo paths
+# Step 5. Generate net cashflows by monte carlo simulation before discounting and early exercise
+# Use previously create model object to generate paths of underlying fixing values and discount factors.
+# Then apply the fixing values to calculate cashflows according to the contract term sheet.
+# The net cashflow object shall be a pandas.DataFrame, with payment date as index and each column is a path of cashflows.
+# The output of this step will be further used in Longstaff-Schwartz method to calculate the fair value of the contract.
+# If there is no early exercise, distcount net cashflow to present value then we have fair value and confidence interval.
 
-# create ibor index factory as input of monte carlo paths generators.
+
+
+# create index factory as input of monte carlo paths generators.
+# In the example, we use Libor 6M, CMS 5Y, Libor 2Y as underlying fixing values.
 def create_ibor_6M(ts):
-    return ql.IborIndex('MyIndex', ql.Period('6m'), 2, currency, calendar, date_rolling_convention, True, dayCount, ts)
-# generate paths by Hull White model
-underlying_path, fixings, discountFactors = hw_model.monte_carlo_paths(index_factories=[create_ibor_6M], fixingSchedule=fixingSchedule, paymentSchedule=paymentSchedule, numPaths=n_path)
-fixings=fixings[0]  # select the first fixing, because we only have one index factory.
-print(f'paths of fixings: \n{fixings}')
+    return ql.IborIndex('Libor_6M', ql.Period('6m'), 2, currency, calendar, date_rolling_convention, True, dayCount, ts)
+def create_cms_5Y(ts):
+    return ql.UsdLiborSwapIsdaFixAm(ql.Period('5y'), ts)
+def create_ibor_2Y(ts):
+    return ql.UsdLiborSwapIsdaFixAm(ql.Period('2y'), ts)
 
+# generate paths of fixing value and discount factor by Hull White model
+underlying_path, fixings, discountFactors = hw_model.monte_carlo_paths(index_factories=[create_ibor_6M, create_cms_5Y, create_ibor_2Y], fixingSchedule=fixingSchedule, paymentSchedule=paymentSchedule, numPaths=n_path)
+libor_fixings=fixings[0]  
+cms_5Y_fixings=fixings[1]
+cms_2Y_fixings=fixings[2]
 
-# fixed cashflows
-year_fraction_rec = np.array(year_fraction(recSchedule, dayCount, accoumulative=False))
-# Note: year_fraction() has 0 in first value, this cowork with schedule created by ql.Schedule which include settlement date, which usuallay has no cashflow.
-fixed_cashflows = pd.DataFrame(notional * fixed_rate * year_fraction_rec, index=recSchedule)
-print(f'\nfixed_cashflows: \n{fixed_cashflows}')
+print(f'paths of libor fixings: \n{libor_fixings}')
+print(f'paths of cms 5Y fixings: \n{cms_5Y_fixings}')
+print(f'paths of cms 2Y fixings: \n{cms_2Y_fixings}')
 
-# floating cashflows
+# Libor cashflows
 # Get fixing rate applies to each corresponding payment date.
-corresponding_fixing_schedule = [get_nearest_fixing_date(d, fixings.index) for d in paySchedule] 
-fixing_value = fixings.loc[corresponding_fixing_schedule]  
+corresponding_fixing_schedule = [get_nearest_fixing_date(d, libor_fixings.index) for d in paySchedule] 
+libor_fixing_value = libor_fixings.loc[corresponding_fixing_schedule]  
+cms_5Y_fixing_value = cms_5Y_fixings.loc[corresponding_fixing_schedule]
+cms_2Y_fixing_value = cms_2Y_fixings.loc[corresponding_fixing_schedule]
 if fixing_in_advance:  # process fixing-in-advance case if True 
-    fixing_value = fixing_value.shift(1)  # Note: the first row of fixing_value is NaN, but this is fine since we don't have payment in the first date.
+    libor_fixing_value = libor_fixing_value.shift(1)  # Note: the first row of all fixing_value is NaN, but this is fine since we don't have payment in the first date.
+    cms_5Y_fixing_value = cms_5Y_fixing_value.shift(1)
+    cms_2Y_fixing_value = cms_2Y_fixing_value.shift(1)
 
-# Apply the fixing values to calculate floating cashflows
+# Apply the fixing values to calculate libor cashflows
 year_fraction_pay = np.array(year_fraction(paySchedule, dayCount, accoumulative=False))[:,np.newaxis] # use np.newaxis to reshape to (n, 1) for broadcast
-floating_cashflows = notional * fixing_value.values * year_fraction_pay  # calculate floating cashflows
-floating_cashflows = pd.DataFrame(floating_cashflows, index=paySchedule)  # convert to dataframe, use paySchedule as index to align with other cashflows.
-print(f'floating_cashflows: \n{floating_cashflows}')
+libor_cashflows = notional * libor_fixing_value.values * year_fraction_pay  # calculate floating cashflows
+libor_cashflows = pd.DataFrame(libor_cashflows, index=paySchedule)  # convert to dataframe, use paySchedule as index to align with other cashflows.
+print(f'\nlibor_cashflows: \n{libor_cashflows}')
 
+
+# Get fixing rate applies to each corresponding payment date.
+corresponding_fixing_schedule = [get_nearest_fixing_date(d, cms_5Y_fixings.index) for d in recSchedule] 
+cms_5Y_fixing_value = cms_5Y_fixings.loc[corresponding_fixing_schedule]
+cms_2Y_fixing_value = cms_2Y_fixings.loc[corresponding_fixing_schedule]
+if fixing_in_advance:  # process fixing-in-advance case if True 
+    cms_5Y_fixing_value = cms_5Y_fixing_value.shift(1)
+    cms_2Y_fixing_value = cms_2Y_fixing_value.shift(1)
+
+# Apply the fixing values to calculate cms spread cashflows
+year_fraction_rec = np.array(year_fraction(recSchedule, dayCount, accoumulative=False))[:,np.newaxis]
+cms_spread = cms_5Y_fixing_value - cms_2Y_fixing_value
+cms_spread_cashflows = notional * cms_spread.values * year_fraction_rec
+cms_spread_cashflows = pd.DataFrame(cms_spread_cashflows, index=recSchedule)
+print(f'\ncms_spread_cashflows: \n{cms_spread_cashflows}')
 
 # Reindex both cashflow with paymentSchedule to calculate net cashflow in correct periods.
-fixed_cashflows = fixed_cashflows.reindex(paymentSchedule).fillna(0)
-floating_cashflows = floating_cashflows.reindex(paymentSchedule).fillna(0)
-net_cashflows = pd.DataFrame(fixed_cashflows.values - floating_cashflows.values, index=paymentSchedule)  # use .values to broadcast.
-print(f'\nnet cashflows: \n{net_cashflows}')
+cms_spread_cashflows = cms_spread_cashflows.reindex(paymentSchedule).fillna(0)
+libor_cashflows = libor_cashflows.reindex(paymentSchedule).fillna(0)
+net_cashflows = pd.DataFrame(cms_spread_cashflows.values - libor_cashflows.values, index=paymentSchedule)  # use .values to broadcast.
+print(f'\nnet cashflows: \n{net_cashflows}')  # note: the first row is 0, because we don't have payment in the first date.
 
-# prepare data for LSE
+# Step 6. Process the early termination by LongstaffSchwartz class.
+# It is important to distinguish between callable/putable features and auto-call features. Callable (or putable, cancellable, Bermudan-style) options give the holder discretionary rights to exercise when advantageous, while auto-call features are triggered automatically when predetermined market conditions are met, without any discretionary decision.
+# The LongstaffSchwartz is specifically designed for Bermudan-style options. As for auto-call features, implement on your own according to the specific contract term sheet.
+
 single_period_dcf = discountFactors/discountFactors.shift(1)
 exercise_dates = paymentSchedule[1:-1]
-exercisable = subset_to_bool(exercise_dates, net_cashflows.index)  # convert from a list of dates to a boolean series
-observations = fixings  # observation is for linear estimator of longstaff schwartz, irelevant of fixing-in-advance or fixing-in-arrears
-exercise_payoff = lambda x: np.zeros(len(x))   # The cashflow of calling(cancelling) the IRS is 0.
+exercisable = subset_to_bool(cancelSchedule, net_cashflows.index)  # convert from a list of dates to a boolean series
+observations = libor_fixings  # The input of linear estimator in longstaff schwartz, irelevant of fixing-in-advance or fixing-in-arrears, it is the available information at that time point to decide exercise or not.
+exercise_payoff = lambda x: np.zeros(len(x))   # The cashflow of calling(cancelling) the contract, in this case is 0.
 lse = LongstaffSchwartz(
     cashflows=net_cashflows.iloc[1:], # remove first row
     discountFactors=single_period_dcf,
