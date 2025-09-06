@@ -237,6 +237,11 @@ def create_GBP_swap_rate_helpers(df: pd.DataFrame):
     floating_leg_conventions = Conventions.GBPFloatingLegConventions()
     return create_swap_rate_helpers(df, fixed_leg_conventions, floating_leg_conventions)
 
+
+def create_USD_OIS_helpers(df: pd.DataFrame):
+    conventions = Conventions.USDOISConventions()
+    return create_OIS_helper(df, conventions)
+
 def create_EUR_OIS_helpers(df: pd.DataFrame):
     conventions = Conventions.EUROISConventions()
     return create_OIS_helper(df, conventions)

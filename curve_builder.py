@@ -51,7 +51,7 @@ def bootstrap_curve_with_instrument_helpers(settlementDate, helpers, dayCount, m
     curve.enableExtrapolation()
     return curve
 
-def bootstrap_USD_curve(settlementDate, deposit: pd.DataFrame=None, swap: pd.DataFrame=None, OIS: pd.DataFrame=None, FRA: pd.DataFrame=None, method: Literal['logLinearDiscount', 'logCubicDiscount','linearZero','cubicZero', 'linearForward','splineCubicDiscount']='linearZero'):
+def _bootstrap_USD_curve(settlementDate, deposit: pd.DataFrame=None, swap: pd.DataFrame=None, OIS: pd.DataFrame=None, FRA: pd.DataFrame=None, method: Literal['logLinearDiscount', 'logCubicDiscount','linearZero','cubicZero', 'linearForward','splineCubicDiscount']='linearZero'):
     """
     Bootstrap a USD yield curve using various market instruments.
     
@@ -93,7 +93,7 @@ def bootstrap_USD_curve(settlementDate, deposit: pd.DataFrame=None, swap: pd.Dat
 
     return bootstrap_curve_with_instrument_helpers(settlementDate, helpers, dayCount)
 
-def bootstrap_EUR_curve(settlementDate, deposit: pd.DataFrame=None, swap: pd.DataFrame=None, OIS: pd.DataFrame=None, FRA: pd.DataFrame=None, method: Literal['logLinearDiscount', 'logCubicDiscount','linearZero','cubicZero', 'linearForward','splineCubicDiscount']='linearZero'):
+def _bootstrap_EUR_curve(settlementDate, deposit: pd.DataFrame=None, swap: pd.DataFrame=None, OIS: pd.DataFrame=None, FRA: pd.DataFrame=None, method: Literal['logLinearDiscount', 'logCubicDiscount','linearZero','cubicZero', 'linearForward','splineCubicDiscount']='linearZero'):
     """
     Bootstrap a EUR yield curve using various market instruments.
     
@@ -135,7 +135,7 @@ def bootstrap_EUR_curve(settlementDate, deposit: pd.DataFrame=None, swap: pd.Dat
 
     return bootstrap_curve_with_instrument_helpers(settlementDate, helpers, dayCount)
 
-def bootstrap_JPY_curve(settlementDate, deposit: pd.DataFrame=None, swap: pd.DataFrame=None, OIS: pd.DataFrame=None, FRA: pd.DataFrame=None, method: Literal['logLinearDiscount', 'logCubicDiscount','linearZero','cubicZero', 'linearForward','splineCubicDiscount']='linearZero'):
+def _bootstrap_JPY_curve(settlementDate, deposit: pd.DataFrame=None, swap: pd.DataFrame=None, OIS: pd.DataFrame=None, FRA: pd.DataFrame=None, method: Literal['logLinearDiscount', 'logCubicDiscount','linearZero','cubicZero', 'linearForward','splineCubicDiscount']='linearZero'):
     """
     Bootstrap a JPY yield curve using various market instruments.
     
@@ -177,7 +177,7 @@ def bootstrap_JPY_curve(settlementDate, deposit: pd.DataFrame=None, swap: pd.Dat
 
     return bootstrap_curve_with_instrument_helpers(settlementDate, helpers, dayCount)
     
-def bootstrap_GBP_curve(settlementDate, deposit: pd.DataFrame=None, swap: pd.DataFrame=None, OIS: pd.DataFrame=None, FRA: pd.DataFrame=None, method: Literal['logLinearDiscount', 'logCubicDiscount','linearZero','cubicZero', 'linearForward','splineCubicDiscount']='linearZero'):
+def _bootstrap_GBP_curve(settlementDate, deposit: pd.DataFrame=None, swap: pd.DataFrame=None, OIS: pd.DataFrame=None, FRA: pd.DataFrame=None, method: Literal['logLinearDiscount', 'logCubicDiscount','linearZero','cubicZero', 'linearForward','splineCubicDiscount']='linearZero'):
     """
     Bootstrap a GBP yield curve using various market instruments.
     
@@ -219,7 +219,7 @@ def bootstrap_GBP_curve(settlementDate, deposit: pd.DataFrame=None, swap: pd.Dat
 
     return bootstrap_curve_with_instrument_helpers(settlementDate, helpers, dayCount)
 
-def bootstrap_TWD_curve(settlementDate, deposit: pd.DataFrame=None, swap: pd.DataFrame=None, method: Literal['logLinearDiscount', 'logCubicDiscount','linearZero','cubicZero', 'linearForward','splineCubicDiscount']='linearZero'):
+def _bootstrap_TWD_curve(settlementDate, deposit: pd.DataFrame=None, swap: pd.DataFrame=None, method: Literal['logLinearDiscount', 'logCubicDiscount','linearZero','cubicZero', 'linearForward','splineCubicDiscount']='linearZero'):
     """
     Bootstrap a TWD yield curve using various market instruments.
     
@@ -277,17 +277,60 @@ def bootstrap_curve(currency: Literal['USD', 'EUR', 'JPY', 'GBP', 'TWD'], settle
         QuantLib yield curve object with specified currency conventions
     """
     if currency == 'USD':
-        return bootstrap_USD_curve(settlementDate, deposit, swap, OIS, FRA, method)
+        fixed_leg_conventions = Conventions.USFixedLegConventions()
+        floating_leg_conventions = Conventions.USFloatingLegConventions()
+        ois_conventions = Conventions.USDOISConventions()
+
     elif currency == 'EUR':
-        return bootstrap_EUR_curve(settlementDate, deposit, swap, OIS, FRA, method)
+        fixed_leg_conventions = Conventions.EURFixedLegConventions()
+        floating_leg_conventions = Conventions.EURFloatingLegConventions()
+        ois_conventions = Conventions.EUROISConventions()
+
     elif currency == 'JPY':
-        return bootstrap_JPY_curve(settlementDate, deposit, swap, OIS, FRA, method)
+        fixed_leg_conventions = Conventions.JPYFixedLegConventions()
+        floating_leg_conventions = Conventions.JPYFloatingLegConventions()
+        ois_conventions = Conventions.JPYOISConventions()
+
     elif currency == 'GBP':
-        return bootstrap_GBP_curve(settlementDate, deposit, swap, OIS, FRA, method)
+        fixed_leg_conventions = Conventions.GBPFixedLegConventions()
+        floating_leg_conventions = Conventions.GBPFloatingLegConventions()
+        ois_conventions = Conventions.GBPOISConventions()
+
+    elif currency == 'CHF':
+        fixed_leg_conventions = Conventions.CHFFixedLegConventions()
+        floating_leg_conventions = Conventions.CHFFloatingLegConventions()
+        ois_conventions = Conventions.CHFOISConventions()
+
     elif currency == 'TWD':
-        return bootstrap_TWD_curve(settlementDate, deposit, swap, method)
+        fixed_leg_conventions = Conventions.TWDFixedLegConventions()
+        floating_leg_conventions = Conventions.TWDFloatingLegConventions()
+        ois_conventions = None
+
     else:
-        raise ValueError(f'Unsupported currency: {currency}')
+        raise ValueError(f"Unsupported currency: {currency}")
+
+    dayCount = fixed_leg_conventions.get('dayCounter', ql.Actual360())
+    helpers = []
+    if deposit is not None:
+        deposit_helpers = create_deposit_rate_helpers(deposit, fixed_leg_conventions)
+        helpers+=deposit_helpers
+    
+    if swap is not None:
+        swap_helpers = create_swap_rate_helpers(swap, fixed_leg_conventions, floating_leg_conventions)
+        helpers+=swap_helpers
+    
+    if OIS is not None and ois_conventions is not None:
+        ois_helpers = create_OIS_helper(OIS, ois_conventions)
+        helpers+=ois_helpers
+    
+    if FRA is not None:
+        fra_helpers = create_fra_rate_helpers(FRA, floating_leg_conventions)
+        helpers+=fra_helpers
+
+    return bootstrap_curve_with_instrument_helpers(settlementDate, helpers, dayCount, method)
+
+
+    
     
 if __name__ == '__main__':
         
@@ -305,17 +348,17 @@ if __name__ == '__main__':
 
 
 
-    curve = bootstrap_USD_curve(today, deposit=df_deposit, swap=df_swap)  # fast builder for USD curve without conventions
-    curve = bootstrap_EUR_curve(today, deposit=df_deposit, swap=df_swap)  # fast builder for EUR curve without conventions
-    curve = bootstrap_JPY_curve(today, deposit=df_deposit, swap=df_swap)  # fast builder for JPY curve without conventions
-    curve = bootstrap_GBP_curve(today, deposit=df_deposit, swap=df_swap)  # fast builder for GBP curve without conventions
-    curve = bootstrap_TWD_curve(today, deposit=df_deposit, swap=df_swap)  # fast builder for TWD curve without conventions
+    curve = _bootstrap_USD_curve(today, deposit=df_deposit, swap=df_swap)  # fast builder for USD curve without conventions
+    curve = _bootstrap_EUR_curve(today, deposit=df_deposit, swap=df_swap)  # fast builder for EUR curve without conventions
+    curve = _bootstrap_JPY_curve(today, deposit=df_deposit, swap=df_swap)  # fast builder for JPY curve without conventions
+    curve = _bootstrap_GBP_curve(today, deposit=df_deposit, swap=df_swap)  # fast builder for GBP curve without conventions
+    curve = _bootstrap_TWD_curve(today, deposit=df_deposit, swap=df_swap)  # fast builder for TWD curve without conventions
     curve = bootstrap_curve('USD', today, deposit=df_deposit, swap=df_swap)  # fast builder for USD curve without conventions
     curve = bootstrap_curve('EUR', today, deposit=df_deposit, swap=df_swap)  # fast builder for EUR curve without conventions
     curve = bootstrap_curve('JPY', today, deposit=df_deposit, swap=df_swap)  # fast builder for JPY curve without conventions
     curve = bootstrap_curve('GBP', today, deposit=df_deposit, swap=df_swap)  # fast builder for GBP curve without conventions
     curve = bootstrap_curve('TWD', today, deposit=df_deposit, swap=df_swap)  # fast builder for TWD curve without conventions
-    
+    curve = bootstrap_curve('CHF', today, deposit=df_deposit, swap=df_swap)  # fast builder for CHF curve without conventions
     schedule = ql.MakeSchedule(today, today + ql.Period(3, ql.Months), ql.Period('1W'))
 
 

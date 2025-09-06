@@ -36,6 +36,31 @@ class LongstaffSchwartz():
         
 
     def backward_induction(self, verbose=False):
+        """
+        Execute the Longstaff-Schwartz backward induction algorithm.
+        
+        Uses linear regression to estimate continuation values and determine optimal
+        early exercise decisions at each time step.
+        
+        Parameters
+        ----------
+        verbose : bool, optional
+            Print detailed step-by-step calculations. Default is False.
+            
+        Returns
+        -------
+        None
+            Updates instance attributes: valuation, survival, regressors, _exercise_cashflows
+            
+        Notes
+        -----
+        After execution, use these methods to access results:
+        - valuations() : Get final valuations.
+        - confidence_interval() : Calculate confidence interval of valuations
+        - survival_probability() : Get survival probabilities at each time step
+        - exercise_cashflows() : Get expected cashflow from exercise payoff
+        - exercise_mask() : Get boolean mask of exercise decisions
+        """
         np.set_printoptions(precision=2, suppress=True)
         pd.set_option('display.float_format', lambda x: f'{x:,.2f}')
         self.regressors = []
@@ -112,20 +137,57 @@ class LongstaffSchwartz():
 
 
     def valuations(self):
+        """
+        Return the expected discounted net present value, i.e. the fair value of the contract.
+        
+        Returns
+        -------
+        pd.Series
+            Expected discounted net present value of each path.
+        """
         return self.valuation
 
     def confidence_interval(self, alpha=0.05):
+        """
+        Return the confidence interval of the fair value with given significance level(two tail).
+        
+        Parameters
+        ----------
+        alpha : float, optional
+            The significance level for the confidence interval. Default is 0.05.
+        
+        Returns
+        -------
+        list
+            The confidence interval of the fair value.
+        """
         # asume sampled valuation is normal distribution, alpha for two tail area.
         std = self.valuation.std()
         mean = self.valuation.mean()
         return [mean - std * np.sqrt(alpha/2), mean + std * np.sqrt(alpha/2)]
         
     def survival_probability(self):
+        """
+        Return the survival probability of each period.
+        
+        Returns
+        -------
+        pd.Series
+            Survival probability of each period.
+        """
         survival = self.survival.cumprod(axis=0)
         self.accumulated_survival = survival
         return survival.mean(axis=1)
 
     def exercise_mask(self):
+        """
+        Return the boolean exercise mask of each path.
+        
+        Returns
+        -------
+        pd.DataFrame
+            Boolean exercise mask of each path.
+        """
         exercise_mask = pd.DataFrame(np.zeros(self.cashflows.shape), index=self.cashflows.index, columns=self.cashflows.columns, dtype=bool)
         has_exercised = np.zeros(self.cashflows.shape[1], dtype=bool)
         for d in self.cashflows.index:
@@ -136,6 +198,14 @@ class LongstaffSchwartz():
         return exercise_mask
 
     def exercise_cashflows(self):
+        """
+        Return the expected value of exercise payoff with consideration of exercise decisions.
+        
+        Returns
+        -------
+        pd.Series
+            Expected value of exercise payoff with consideration of exercise decisions.
+        """
         exercise_mask = self.exercise_mask()
         cf = self._exercise_cashflows * exercise_mask
         return cf.mean(axis=1)

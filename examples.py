@@ -4,7 +4,7 @@ import QuantLib as ql
 from util import *
 from conventions import Conventions
 from rate_helpers import *
-from curve_builder import bootstrap_curve, bootstrap_USD_curve, bootstrap_EUR_curve, bootstrap_JPY_curve, bootstrap_GBP_curve, bootstrap_TWD_curve, bootstrap_curve_with_instrument_helpers
+from curve_builder import bootstrap_curve, bootstrap_curve_with_instrument_helpers
 from vol_helper import *
 from leastSquareError import LongstaffSchwartz
 from models import HullWhiteModel, HestonModel, MultiAssetModel, BlackScholesMertonModel, GarmanKohlagenProcessModel
@@ -119,46 +119,6 @@ conventions['frequency'] = ql.Period('6M')
 bond_helpers = create_bond_helper(df_bond, conventions=conventions)
 
 
-#@Description
-"""quick deposit helper builder for each currency without need to pass conventions"""
-#@code
-df_deposit = pd.DataFrame({'tenor': ['1M', '2M', '3M', '6M', '1Y'], 'rates': [0.015, 0.018, 0.02, 0.022, 0.025]})
-create_USD_deposit_rate_helpers(df_deposit)
-create_EUR_deposit_rate_helpers(df_deposit)
-create_JPY_deposit_rate_helpers(df_deposit)
-create_TWD_deposit_rate_helpers(df_deposit)
-create_CHF_deposit_rate_helpers(df_deposit)
-create_GBP_deposit_rate_helpers(df_deposit)
-
-#@Description
-"""quick swap helper builder for each currency without need to pass conventions"""
-#@code
-df_swap = pd.DataFrame({'rate': [0.015, 0.018, 0.02], 'tenor': ['5Y', '7Y', '10Y']})
-create_USD_swap_rate_helpers(df_swap)
-create_EUR_swap_rate_helpers(df_swap)
-create_JPY_swap_rate_helpers(df_swap)
-create_TWD_swap_rate_helpers(df_swap)
-create_CHF_swap_rate_helpers(df_swap)
-create_GBP_swap_rate_helpers(df_swap)
-
-#@Description
-"""quick OIS helper builder for each currency without need to pass conventions"""
-#@code
-df_OIS = pd.DataFrame({'tenor': ['1M', '2M', '3M', '6M', '1Y'], 'rate': [0.015, 0.018, 0.02, 0.022, 0.025]})
-create_EUR_OIS_helpers(df_OIS)
-create_GBP_OIS_helpers(df_OIS)
-create_JPY_OIS_helpers(df_OIS)
-create_CHF_OIS_helpers(df_OIS)
-
-#@Description
-"""quick FRA helper builder for each currency without need to pass conventions"""
-#@code
-df_fra = pd.DataFrame({'monthsToStart': [1, 2, 3], 'monthsToEnd': [7, 8, 9], 'rates': [0.021, 0.023, 0.025]})
-create_USD_FRA_helpers(df_fra)
-create_EUR_FRA_helpers(df_fra)
-create_CHF_FRA_helpers(df_fra)
-create_GBP_FRA_helpers(df_fra)
-create_JPY_FRA_helpers(df_fra)  
 
 
 
@@ -191,7 +151,7 @@ curve = bootstrap_curve('USD', today, deposit=df_deposit, swap=df_swap)
 """swaption helper builder, use to calibrate interest rate model.
 keywords: swaption helper, volatility, interest rate model, calibration"""
 #@code
-from curve_builder import bootstrap_USD_curve
+from curve_builder import bootstrap_curve
 today = ql.Date().todaysDate()
 df_deposit = pd.DataFrame({
 'tenor': ['1M', '2M', '3M', '6M', '9M'],
@@ -202,7 +162,7 @@ df_swap = pd.DataFrame({
     'tenor': ['1Y', '2Y', '5Y', '7Y', '10Y']
 })
 
-curve = bootstrap_USD_curve(today, deposit=df_deposit, swap=df_swap)
+curve = bootstrap_curve('USD', today, deposit=df_deposit, swap=df_swap)
 fixed_leg_conventions = Conventions.USFixedLegConventions()
 fixed_leg_conventions['tenor'] = ql.Period('1Y')
 floating_leg_conventions = Conventions.USFloatingLegConventions()
@@ -218,12 +178,7 @@ engine = ql.JamshidianSwaptionEngine(model)
 # note: engine is not necessary to create swaption helpers, but you need to set egine to each helper before calibrate the model.
 # The following is more recommended way to create swaption helpers unless currency is not supported.
 swaption_helpers = create_swaption_helper(df_swaption, curve, engine, fixed_leg_conventions, floating_leg_conventions)
-swaption_helpers = create_USD_swaption_helpers(df_swaption, curve, engine)  # fast builder for USD swaption without conventions
-swaption_helpers = create_EUR_swaption_helpers(df_swaption, curve, engine)  # fast builder for EUR swaption without conventions
-swaption_helpers = create_JPY_swaption_helpers(df_swaption, curve, engine)  # fast builder for JPY swaption without conventions
-swaption_helpers = create_GBP_swaption_helpers(df_swaption, curve, engine)  # fast builder for GBP swaption without conventions
-swaption_helpers = create_CHF_swaption_helpers(df_swaption, curve, engine)  # fast builder for CHF swaption without conventions
-swaption_helpers = create_TWD_swaption_helpers(df_swaption, curve, engine)  # fast builder for TWD swaption without conventions
+
 
 
 #@Description

@@ -120,6 +120,15 @@ class Conventions:
         return conventions
 
     @classmethod
+    def USDOISConventions(cls):
+        return {
+            'settlement_days': 2,
+            'dayCounter': ql.Actual360(),
+            'calendar': ql.UnitedStates(ql.UnitedStates.Settlement),
+            'currency': ql.USDCurrency()
+        }
+
+    @classmethod
     def EUROISConventions(cls):
         return {
             'settlement_days': 2,

@@ -26,13 +26,7 @@ def create_black_vol_curve(vol_curve: pd.Series, reference_date:ql.Date, dayCoun
     -------
     QuantLib.BlackVarianceCurve
         Configured BlackVarianceCurve with extrapolation enabled for pricing derivatives
-        
-    Notes
-    -----
-    - The function automatically enables extrapolation on the volatility curve
-    - Index values in the Series are converted to QuantLib.Period objects
-    - This curve can be used with various QuantLib pricing engines for option valuation
-    - The curve represents term structure of volatility for a single underlying asset
+
     """
 
 
@@ -70,15 +64,7 @@ def create_black_vol_surface(df: pd.DataFrame, reference_date:ql.Date, dayCount:
     -------
     QuantLib.BlackVarianceSurface
         Configured BlackVarianceSurface with extrapolation enabled for pricing derivatives
-        
-    Notes
-    -----
-    - The function automatically enables extrapolation on the volatility surface
-    - Column names in the DataFrame are converted to QuantLib.Period objects
-    - The volatility matrix is constructed with strikes as rows and expirations as columns
-    - This surface can be used with various QuantLib pricing engines for option valuation
-
-
+ 
     """
     
     expirations = [reference_date+ql.Period(tenor) for tenor in df.columns]
@@ -95,9 +81,7 @@ def create_heston_model_helper(df: pd.DataFrame, spot:float, yield_curve, divide
     """
     Create a list of QuantLib HestonModelHelper objects from a DataFrame containing option market data.
     
-    This function constructs Heston model helpers used for calibrating the Heston stochastic volatility model
-    by creating HestonModelHelper objects with the specified option market data and underlying parameters.
-    
+    HestonModelHelper is used for calibrating the Heston stochastic volatility model.    
     Parameters
     ----------
     df : pandas.DataFrame
@@ -121,13 +105,7 @@ def create_heston_model_helper(df: pd.DataFrame, spot:float, yield_curve, divide
     list of QuantLib.HestonModelHelper
         List of configured HestonModelHelper objects ready for Heston model calibration
         
-    Notes
-    -----
-    - The helpers are typically used in Heston model calibration procedures
-    - If a pricing engine is provided, it will be set on each helper for valuation
-    - The function converts string tenors to QuantLib.Period objects automatically
-    - Volatilities are wrapped in QuantLib.QuoteHandle objects for the helpers
-    
+   
     """
     yield_curve_handler = ql.YieldTermStructureHandle(yield_curve)
     dividend_curve_handler = ql.YieldTermStructureHandle(dividend_curve)
@@ -150,8 +128,7 @@ def create_swaption_helper(df, curve, engine=None, fixed_leg_conventions=None, f
     """
     Create a list of QuantLib SwaptionHelper objects from a DataFrame containing swaption market data.
     
-    This function constructs swaption helpers used for calibrating interest rate models by creating
-    SwaptionHelper objects with the specified market data and conventions.
+    SwaptionHelper is used for calibrating interest rate models like Hull-White model.
     
     Parameters
     ----------
@@ -176,13 +153,7 @@ def create_swaption_helper(df, curve, engine=None, fixed_leg_conventions=None, f
     -------
     list of QuantLib.SwaptionHelper
         List of configured SwaptionHelper objects ready for model calibration
-        
-    Notes
-    -----
-    - If conventions are not provided, US market conventions are used as defaults
-    - The function creates an IborIndex for the floating leg using the provided conventions
-    - Each helper can optionally have a pricing engine set for valuation
-    - The helpers are typically used in interest rate model calibration procedures
+
 
     """
 

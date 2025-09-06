@@ -7,7 +7,7 @@ from util import (
     year_fraction,
     combine_schedule
 )
-from curve_builder import bootstrap_USD_curve, bootstrap_curve
+from curve_builder import bootstrap_curve
 from leastSquareError import LongstaffSchwartz
 from models import HullWhiteModel
 from market_data import (
@@ -174,7 +174,7 @@ print(f'\nnet cashflows: \n{net_cashflows}')  # note: the first row is 0, becaus
 # The LongstaffSchwartz is specifically designed for Bermudan-style options. As for auto-call features, implement on your own according to the specific contract term sheet.
 
 single_period_dcf = discountFactors/discountFactors.shift(1)
-exercise_dates = paymentSchedule[1:-1]
+
 exercisable = subset_to_bool(cancelSchedule, net_cashflows.index)  # convert from a list of dates to a boolean series
 observations = libor_fixings  # The input of linear estimator in longstaff schwartz, irelevant of fixing-in-advance or fixing-in-arrears, it is the available information at that time point to decide exercise or not.
 exercise_payoff = lambda x: np.zeros(len(x))   # The cashflow of calling(cancelling) the contract, in this case is 0.

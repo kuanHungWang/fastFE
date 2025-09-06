@@ -19,12 +19,26 @@ from market_data import get_volatility_surface
 
 
 def calibration_detail(helpers):
+    """
+    Return the calibration detail of the model.
+    
+    Parameters
+    ----------
+    helpers : list
+        The list of helpers used for calibration.
+    
+    Returns
+    -------
+    pd.DataFrame
+        The model value, market value and calibration error of each helper.
+    """
     modelValues = [helper.modelValue() for helper in helpers]
     marketValues = [helper.marketValue() for helper in helpers]
     calibrationErrors = [helper.calibrationError() for helper in helpers]
     return pd.DataFrame({'modelValue': modelValues, 'marketValue': marketValues, 'calibrationError': calibrationErrors})
 
 class GarmanKohlagenProcessModel():
+    
     def __init__(self, foreignRiskCurve, domesticRiskFreeCurve, vol_curve, initialValue):
         """
         Initialize a Garman-Kohlhagen process model for FX option pricing.
@@ -174,6 +188,18 @@ class BlackScholesMertonModel():
         
 class HullWhiteModel():
     def __init__(self, settlementDate, curve, currency):
+        """
+        Initialize a Hull-White model for interest rate simulation.
+
+        Parameters
+        ----------
+        settlementDate : ql.Date
+            The settlement date for the model
+        curve : ql.YieldTermStructure
+            The yield curve for the model
+        currency : str
+            The currency for the model
+        """
         self.curve = curve
         self.currency = currency
         self.settlementDate = settlementDate
@@ -250,7 +276,7 @@ class HullWhiteModel():
               DataFrame containing the simulated short rate paths. The index consists of
               daily dates, and each column represents one simulation path.
             - fixings_dfs : list of pandas.DataFrame
-              List of DataFrames containing the simulated index fixings for each index factory.
+              List of DataFrames containing the simulated index fixings corresponding to each index factory in the input.
               Each DataFrame has fixing dates as index and paths as columns.
             - discountFactors_df : pandas.DataFrame
               DataFrame containing the simulated discount factors. The index consists of
