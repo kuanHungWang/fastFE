@@ -103,11 +103,11 @@ print(f'cancelSchedule: {cancelSchedule}')
 
 
 # Step 5. Generate net cashflows by monte carlo simulation before discounting and early exercise
-# Use previously create model object to generate paths of underlying fixing values and discount factors.
+# Use previously created model object to generate paths of underlying fixing values and discount factors.
 # Then apply the fixing values to calculate cashflows according to the contract term sheet.
 # The net cashflow object shall be a pandas.DataFrame, with payment date as index and each column is a path of cashflows.
 # The output of this step will be further used in Longstaff-Schwartz method to calculate the fair value of the contract.
-# If there is no early exercise, distcount net cashflow to present value then we have fair value and confidence interval.
+# For other cases, if there is no early exercise, distcount net cashflow to present value then we have fair value and confidence interval.
 
 
 
@@ -134,13 +134,8 @@ print(f'paths of cms 2Y fixings: \n{cms_2Y_fixings}')
 # Get fixing rate applies to each corresponding payment date.
 corresponding_fixing_schedule = [get_nearest_fixing_date(d, libor_fixings.index) for d in paySchedule] 
 libor_fixing_value = libor_fixings.loc[corresponding_fixing_schedule]  
-cms_5Y_fixing_value = cms_5Y_fixings.loc[corresponding_fixing_schedule]
-cms_2Y_fixing_value = cms_2Y_fixings.loc[corresponding_fixing_schedule]
 if fixing_in_advance:  # process fixing-in-advance case if True 
     libor_fixing_value = libor_fixing_value.shift(1)  # Note: the first row of all fixing_value is NaN, but this is fine since we don't have payment in the first date.
-    cms_5Y_fixing_value = cms_5Y_fixing_value.shift(1)
-    cms_2Y_fixing_value = cms_2Y_fixing_value.shift(1)
-
 # Apply the fixing values to calculate libor cashflows
 year_fraction_pay = np.array(year_fraction(paySchedule, dayCount, accoumulative=False))[:,np.newaxis] # use np.newaxis to reshape to (n, 1) for broadcast
 libor_cashflows = notional * libor_fixing_value.values * year_fraction_pay  # calculate floating cashflows
@@ -155,7 +150,6 @@ cms_2Y_fixing_value = cms_2Y_fixings.loc[corresponding_fixing_schedule]
 if fixing_in_advance:  # process fixing-in-advance case if True 
     cms_5Y_fixing_value = cms_5Y_fixing_value.shift(1)
     cms_2Y_fixing_value = cms_2Y_fixing_value.shift(1)
-
 # Apply the fixing values to calculate cms spread cashflows
 year_fraction_rec = np.array(year_fraction(recSchedule, dayCount, accoumulative=False))[:,np.newaxis]
 cms_spread = cms_5Y_fixing_value - cms_2Y_fixing_value
