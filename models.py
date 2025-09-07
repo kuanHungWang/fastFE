@@ -3,12 +3,7 @@ import pandas as pd
 import numpy as np
 from typing import List, Callable
 from vol_helper import (
-    create_USD_swaption_helpers,
-    create_EUR_swaption_helpers,
-    create_JPY_swaption_helpers,
-    create_GBP_swaption_helpers,
-    create_CHF_swaption_helpers,
-    create_TWD_swaption_helpers,
+    create_swaption_helper,
     create_heston_model_helper,
     create_black_vol_curve,
     create_black_vol_surface
@@ -228,12 +223,10 @@ class HullWhiteModel():
 
 
 
-        builders ={'USD': create_USD_swaption_helpers, 'EUR': create_EUR_swaption_helpers, 'JPY': create_JPY_swaption_helpers, 'GBP': create_GBP_swaption_helpers, 'CHF': create_CHF_swaption_helpers, 'TWD': create_TWD_swaption_helpers}
         term_structure = ql.YieldTermStructureHandle(self.curve)
         model = ql.HullWhite(term_structure)
         engine = ql.JamshidianSwaptionEngine(model)
-        helper_builder = builders[self.currency]
-        helpers = helper_builder(swaption, self.curve, engine)
+        helpers = create_swaption_helper(self.currency, swaption, self.curve, engine)
 
         optimization_method = ql.LevenbergMarquardt(1.0e-8,1.0e-8,1.0e-8)
         end_criteria = ql.EndCriteria(10000, 100, 1e-6, 1e-8, 1e-8)

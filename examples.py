@@ -120,21 +120,6 @@ bond_helpers = create_bond_helper(df_bond, conventions=conventions)
 
 
 
-
-
-#@Description
-"""Build curve from helpers. Recommend to use quick curve builder unless currency is not supported"""
-#@code
-today = ql.Date().todaysDate()
-df_deposit = pd.DataFrame({'tenor': ['1M', '2M', '3M', '6M', '9M'], 'rates': [0.015, 0.018, 0.02, 0.022, 0.025]})
-deposit_helpers = create_USD_deposit_rate_helpers(df_deposit)
-df_swap = pd.DataFrame({'rate': [0.015, 0.018, 0.02, 0.022, 0.025],'tenor': ['1Y', '2Y', '5Y', '7Y', '10Y']})
-swap_helpers = create_USD_swap_rate_helpers(df_swap)
-
-curve = bootstrap_curve_with_instrument_helpers(today, deposit_helpers, ql.Actual360())  # use deposit helper only
-curve = bootstrap_curve_with_instrument_helpers(today, deposit_helpers + swap_helpers, ql.Actual360())  # use deposit and swap helpers
-
-
 #@Description
 """Build curve from market data dataFrame for specific currency witout need to pass conventions, which is the easiest way to build curve
 keywords: USD curve, EUR curve, JPY curve, GBP curve, TWD curve, quick curve builder, recommended curve builder
@@ -152,6 +137,7 @@ curve = bootstrap_curve('USD', today, deposit=df_deposit, swap=df_swap)
 keywords: swaption helper, volatility, interest rate model, calibration"""
 #@code
 from curve_builder import bootstrap_curve
+from vol_helper import create_swaption_helper
 today = ql.Date().todaysDate()
 df_deposit = pd.DataFrame({
 'tenor': ['1M', '2M', '3M', '6M', '9M'],
@@ -163,21 +149,12 @@ df_swap = pd.DataFrame({
 })
 
 curve = bootstrap_curve('USD', today, deposit=df_deposit, swap=df_swap)
-fixed_leg_conventions = Conventions.USFixedLegConventions()
-fixed_leg_conventions['tenor'] = ql.Period('1Y')
-floating_leg_conventions = Conventions.USFloatingLegConventions()
 df_swaption = pd.DataFrame({
     'maturity': ['2Y', '3Y'],
     'length': ['5Y', '5Y'],
     'volatility': [0.0055, 0.0055]
 })
-term_structure = ql.YieldTermStructureHandle(curve)
-model = ql.HullWhite(term_structure);
-engine = ql.JamshidianSwaptionEngine(model)
-
-# note: engine is not necessary to create swaption helpers, but you need to set egine to each helper before calibrate the model.
-# The following is more recommended way to create swaption helpers unless currency is not supported.
-swaption_helpers = create_swaption_helper(df_swaption, curve, engine, fixed_leg_conventions, floating_leg_conventions)
+swaption_helpers = create_swaption_helper('USD', df_swaption, curve, engine)
 
 
 
