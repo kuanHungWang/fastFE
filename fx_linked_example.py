@@ -61,11 +61,11 @@ print(f' settlement date: {settlementDate}')
 
 # Step 2. Prepare market data, including data to bootstrap curve and construct model.
 # In this example: deposit and swap for both EUR and USD to bootstrap yield curve, volativlity surfaces and spot price for EURUSD to construct Garman-Kohlagen model
-eur_deposit = get_deposit(['1M', '2M', '3M', '6M', '9M'])
-eur_swap = get_swap(['1Y', '2Y', '5Y', '7Y', '10Y', '15Y', '20Y', '25Y', '30Y'])
+eur_deposit = get_deposit('EUR', ['1M', '2M', '3M', '6M', '9M'])
+eur_swap = get_swap('EUR', ['1Y', '2Y', '5Y', '7Y', '10Y', '15Y', '20Y', '25Y', '30Y'])
 
-usd_deposit = get_deposit(['1M', '2M', '3M', '6M', '9M'])
-usd_swap = get_swap(['1Y', '2Y', '5Y', '7Y', '10Y', '15Y', '20Y', '25Y', '30Y'])
+usd_deposit = get_deposit('USD', ['1M', '2M', '3M', '6M', '9M'])
+usd_swap = get_swap('USD', ['1Y', '2Y', '5Y', '7Y', '10Y', '15Y', '20Y', '25Y', '30Y'])
 
 eurusd_vol = get_volatility_surface('EUR', ['1M', '2M', '3M', '6M', '9M', '12M'], [1.05, 1.07, 1.09, 1.11, 1.13, 1.15])
 

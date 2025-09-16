@@ -3,11 +3,12 @@ import numpy as np
 from typing import List
 import QuantLib as ql
 
-def get_deposit(tenor:List[str]) -> pd.DataFrame:
+def get_deposit(currency:str,tenor:List[str]) -> pd.DataFrame:
     """
     Get mock deposit rates for given tenors.
 
     Args:
+        currency (str): Currency of the deposit.
         tenor (List[str]): List of tenors. format: '1M', '2M', '3M', '6M', '9M', '1Y'
     
     Returns:
@@ -23,11 +24,12 @@ def get_deposit(tenor:List[str]) -> pd.DataFrame:
     })
 
 
-def get_swap(tenor:List[str]) -> pd.DataFrame:
+def get_swap(currency:str, tenor:List[str]) -> pd.DataFrame:
     """
     Get mock swap rates for given tenors.
 
     Args:
+        currency (str): Currency of the swap.
         tenor (List[str]): List of tenors. format: '1Y', '2Y', '5Y', '7Y', '10Y', '15Y', '20Y', '25Y', '30Y'
     
     Returns:
@@ -42,11 +44,12 @@ def get_swap(tenor:List[str]) -> pd.DataFrame:
         'rate': np.linspace(short_end, short_end + curve_deeepness, n) + convexity * np.linspace(0, 1, n) ** 2
     })
     
-def get_swaption(maturity:List[str], length:List[str]) -> pd.DataFrame:
+def get_swaption(currency:str, maturity:List[str], length:List[str]) -> pd.DataFrame:
     """
     Get mock swaption volatilities for given tenors.
 
     Args:
+        currency (str): Currency of the swap.
         maturity (List[str]): List of tenors. format: '1Y', '2Y', '5Y', '7Y', '10Y', '15Y', '20Y', '25Y', '30Y'
         length (List[str]): List of tenors. format: '1Y', '2Y', '5Y', '7Y', '10Y', '15Y', '20Y', '25Y', '30Y'
     
@@ -63,11 +66,12 @@ def get_swaption(maturity:List[str], length:List[str]) -> pd.DataFrame:
         'volatility': np.random.normal(mean_level, std_dev, n)
     })
 
-def get_OIS(tenor:List[str]) -> pd.DataFrame:
+def get_OIS(currency:str, tenor:List[str]) -> pd.DataFrame:
     """
     Get mock OIS rates for given tenors.
 
     Args:
+        currency (str): Currency of the OIS.
         tenor (List[str]): List of tenors. format: '1M', '2M', '3M', '6M', '9M', '1Y'
     
     Returns:
@@ -82,11 +86,12 @@ def get_OIS(tenor:List[str]) -> pd.DataFrame:
         'rate': np.linspace(short_end, short_end + curve_deeepness, n) + convexity * np.linspace(0, 1, n) ** 2
     })
 
-def get_FRA(monthsToStart:List[int], monthsToEnd:List[int]) -> pd.DataFrame:
+def get_FRA(currency:str, monthsToStart:List[int], monthsToEnd:List[int]) -> pd.DataFrame:
     """
     Get mock FRA rates for given tenors.
 
     Args:
+        currency (str): Currency of the FRA.
         monthsToStart (List[int]): List of months to start. format: [1, 2, 3, 6, 9, 12]
         monthsToEnd (List[int]): List of months to end. format: [1, 2, 3, 6, 9, 12]
     
@@ -132,8 +137,13 @@ def get_sofr_future(years:List[int], months:List[int], freq:list) -> pd.DataFram
 def get_volatility_surface(ticker: str, tenor: List[str], strikes: List[float]) -> pd.DataFrame:
     """
     Create a mock vol surface for given ticker, tenor and strikes.
-    Return: pd.DataFrame, index: strike, columns: tenor
-    Generated value must be positive value between 0.3 and 0.7, smooth and increasing with tenor.
+    Args:
+        ticker (str): Ticker of the asset.
+        tenor (List[str]): List of tenors. format: '1M', '2M', '3M', '6M', '9M', '1Y'
+        strikes (List[float]): List of strikes.
+    Returns:
+        pd.DataFrame, the index is strike, columns are tenor
+
     """
     n_strikes = len(strikes)
     n_tenors = len(tenor)
@@ -159,6 +169,22 @@ def get_volatility_surface(ticker: str, tenor: List[str], strikes: List[float]) 
     df = pd.DataFrame(surface, index=strikes, columns=tenor)
     df = df.rolling(window=3, min_periods=1, center=True).mean()
     return df
+def get_volatility_table(ticker: str, tenor: List[str], strikes: List[float]) -> pd.DataFrame:
+    """
+    Create a mock vol table for given ticker, tenor and strikes.
+    Args:
+        ticker (str): Ticker of the asset.
+        tenor (List[str]): List of tenors. format: '1M', '2M', '3M', '6M', '9M', '1Y'
+        strikes (List[float]): List of strikes.
+    Returns:
+        pd.DataFrame, columns: strike, expiration, vol
+
+    """
+    volatility_surface = get_volatility_surface(ticker, tenor, strikes)
+    volatility_table = volatility_surface.stack().reset_index()
+    volatility_table.columns = ['strike', 'expiration', 'vol']
+    return volatility_table
+
 
 def get_price(ticker: str) -> float:
     """

@@ -41,13 +41,7 @@ n_path = 6
 
 # conventions
 calendar = ql.UnitedStates(ql.UnitedStates.Settlement)
-date_rolling_convention = ql.ModifiedFollowing
-date_termination_convention = ql.ModifiedFollowing
-pay_frequency = ql.Period(pay_frequency)
-rec_frequency = ql.Period(rec_frequency)
-dayCount = ql.Thirty360(ql.Thirty360.USA)
-currency = ql.USDCurrency()
-rule = ql.DateGeneration.Forward
+
 
 # set evaluation date
 today = ql.Date().todaysDate()
@@ -60,11 +54,11 @@ print(f' settlement date: {settlementDate}')
 # Step 2. Prepare market data, including data to bootstrap curve and data to calibrate model.
 # For this example, we use deposit and swap data to bootstrap curve, and swaption data to calibrate Hull White model.
 # Market data to bootstrap curve.
-df_deposit = get_deposit(['1M', '2M', '3M', '6M', '9M'])
-df_swap = get_swap(['1Y', '2Y', '5Y', '7Y', '10Y', '15Y', '20Y', '25Y', '30Y'])
+df_deposit = get_deposit('USD', ['1M', '2M', '3M', '6M', '9M'])
+df_swap = get_swap('USD', ['1Y', '2Y', '5Y', '7Y', '10Y', '15Y', '20Y', '25Y', '30Y'])
 
 # swaption data to calibrate Hull White model
-df_swaption = get_swaption(['2Y', '3Y'], ['5Y', '5Y'])
+df_swaption = get_swaption('USD', ['2Y', '3Y'], ['5Y', '5Y'])
 
 
 # Step 3. Create curve and model, use previously created market data as input and calibration data.
@@ -77,7 +71,12 @@ hw_model.calibrate(df_swaption)
 # In this example:  
 # For payment schedule, we need to create two schedules for fixed leg(yearly) and floating leg(semi-annual).
 # For fixing schedule, we need to create a schedule which is 2 business days before payment date.
-
+date_rolling_convention = ql.ModifiedFollowing
+date_termination_convention = ql.ModifiedFollowing
+pay_frequency = ql.Period(pay_frequency)
+rec_frequency = ql.Period(rec_frequency)
+dayCount = ql.Thirty360(ql.Thirty360.USA)
+rule = ql.DateGeneration.Forward
 terminationDate = calendar.advance(settlementDate, ql.Period(tenor, ql.Years))
 endOfMonth = calendar.isEndOfMonth(terminationDate)
 paySchedule = ql.Schedule(settlementDate, terminationDate, pay_frequency, calendar, date_rolling_convention, date_termination_convention, rule, endOfMonth)
@@ -114,7 +113,7 @@ print(f'cancelSchedule: {cancelSchedule}')
 # create index factory as input of monte carlo paths generators.
 # In the example, we use Libor 6M, CMS 5Y, Libor 2Y as underlying fixing values.
 def create_ibor_6M(ts):
-    return ql.IborIndex('Libor_6M', ql.Period('6m'), 2, currency, calendar, date_rolling_convention, True, dayCount, ts)
+    return ql.IborIndex('Libor_6M', ql.Period('6m'), 2, ql.USDCurrency(), calendar, date_rolling_convention, True, dayCount, ts)
 def create_cms_5Y(ts):
     return ql.UsdLiborSwapIsdaFixAm(ql.Period('5y'), ts)
 def create_ibor_2Y(ts):

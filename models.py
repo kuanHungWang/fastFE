@@ -546,7 +546,7 @@ if __name__ == '__main__':
     dayCount = ql.Actual365Fixed()
     calendar = ql.WeekendsOnly()
     heston_vol_df = pd.DataFrame({
-        'option_tenor': ['1M', '2M', '3M', '6M', '9M'],
+        'expiration': ['1M', '2M', '3M', '6M', '9M'],
         'strike': [100, 110, 120, 130, 140],
         'vol': [0.015, 0.018, 0.02, 0.022, 0.025]
     })

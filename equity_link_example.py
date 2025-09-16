@@ -11,6 +11,7 @@ from market_data import (
     get_deposit,
     get_swap,
     get_price,
+    get_volatility_table,
     get_dividend_rate
 )
 
@@ -66,16 +67,16 @@ print(f' settlement date: {settlementDate}')
 # For equity linked products, we typically need: (1) interest rate curve data for discounting, (2) equity volatility data for equity model calibration, (3) current equity spot price and dividend information.
 
 # Market data to bootstrap interest rate curve
-df_deposit = get_deposit(['1M', '2M', '3M', '6M', '9M'])
-df_swap = get_swap(['1Y', '2Y', '5Y', '7Y', '10Y', '15Y', '20Y', '25Y', '30Y'])
+df_deposit = get_deposit('USD', ['1M', '2M', '3M', '6M', '9M'])
+df_swap = get_swap('USD', ['1Y', '2Y', '5Y', '7Y', '10Y', '15Y', '20Y', '25Y', '30Y'])
 
 # Equity volatility data to calibrate Heston model
 # For equity linked products, volatility surface data is crucial for accurate pricing
-df_heston_vol = pd.DataFrame({
-    'option_tenor': ['1M', '2M', '3M', '6M', '9M'],
-    'strike': [0.015, 0.018, 0.02, 0.022, 0.025],
-    'vol': [0.015, 0.018, 0.02, 0.022, 0.025]
-}) 
+
+
+df_heston_vol = get_volatility_table('AAPL', ['1M', '3M', '6M', '9M'], [0.015,  0.02,  0.025])
+
+
 
 # Step 3. Create curves and models, use previously created market data as input and calibration data.
 # For equity linked products, we need: (1) yield curve for discounting, (2) dividend curve for equity forward calculation, (3) equity model (e.g., Heston) for volatility dynamics.

@@ -86,7 +86,7 @@ def create_heston_model_helper(df: pd.DataFrame, spot:float, yield_curve, divide
     ----------
     df : pandas.DataFrame
         DataFrame containing option market data with required columns:
-        - 'option_tenor': str, time to option expiry (e.g., '1M', '3M', '6M')
+        - 'expiration': str, time to option expiry (e.g., '1M', '3M', '6M')
         - 'strike': float, strike price of the option
         - 'vol': float, implied volatility of the option
     spot : float
@@ -112,7 +112,7 @@ def create_heston_model_helper(df: pd.DataFrame, spot:float, yield_curve, divide
     helpers = []
 
     for _, row in df.iterrows():
-        option_tenor = row['option_tenor']
+        option_tenor = row['expiration']
         strike = float(row['strike'])
         vol = float(row['vol'])
         vol =ql.QuoteHandle(ql.SimpleQuote(vol))
@@ -348,7 +348,7 @@ if __name__ == '__main__':
 
     # heston model helper, use to calibrate heston model.
     heston_vol_df = pd.DataFrame({
-        'option_tenor': ['1M', '2M', '3M', '6M', '9M'],
+        'expiration': ['1M', '2M', '3M', '6M', '9M'],
         'strike': [0.015, 0.018, 0.02, 0.022, 0.025],
         'vol': [0.015, 0.018, 0.02, 0.022, 0.025]
     }) 
