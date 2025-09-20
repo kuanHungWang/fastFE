@@ -80,7 +80,7 @@ df_heston_vol = get_volatility_table('AAPL', ['1M', '3M', '6M', '9M'], [0.015,  
 
 # Step 3. Create curves and models, use previously created market data as input and calibration data.
 # For equity linked products, we need: (1) yield curve for discounting, (2) dividend curve for equity forward calculation, (3) equity model (e.g., Heston) for volatility dynamics.
-yieldCurve = bootstrap_curve('USD', today, deposit=df_deposit, swap=df_swap)
+yieldCurve = bootstrap_curve(today, deposit=df_deposit, swap=df_swap)
 
 # Equity market data: spot price and dividend information
 spot = get_price('AAPL')

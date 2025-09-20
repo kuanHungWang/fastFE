@@ -74,8 +74,8 @@ print(f' settlement date: {settlementDate}')
 # (2) equity volatility data , spot price, dividend curve of both underlyings for each equity model.
 # (3) correlation matrix of both underlyings for multi-asset model. (Can calculate from historical data or just give a reasonable assumption)
 
-df_deposit = get_deposit(['1M', '2M', '3M', '6M', '9M'])
-df_swap = get_swap(['1Y', '2Y', '5Y', '7Y', '10Y', '15Y', '20Y', '25Y', '30Y'])
+df_deposit = get_deposit('USD', ['1M', '2M', '3M', '6M', '9M'])
+df_swap = get_swap('USD', ['1Y', '2Y', '5Y', '7Y', '10Y', '15Y', '20Y', '25Y', '30Y'])
 
 spot_AAPL = get_price('AAPL')
 dividend_rate_AAPL = get_dividend_rate('AAPL')
@@ -89,7 +89,7 @@ corrMatrix = [[1, 0.5], [0.5, 1]]
 
 # Step 3. Create curves and models, use previously created market data as input.
 
-riskFreeCurve = bootstrap_curve('USD', today, deposit=df_deposit, swap=df_swap)
+riskFreeCurve = bootstrap_curve(today, deposit=df_deposit, swap=df_swap)
 dividendCurve_AAPL = ql.FlatForward(today, dividend_rate_AAPL, dayCount)  # Usually don't use flat curve in real world, just simplify for example.
 vol_surface_AAPL = create_black_vol_surface(df_vol_surface_AAPL, today)
 black_model_vol_surface_AAPL = BlackScholesMertonModel(riskFreeCurve, dividendCurve_AAPL, vol_surface_AAPL, spot_AAPL)

@@ -182,7 +182,7 @@ class BlackScholesMertonModel():
         return spot_paths_df
         
 class HullWhiteModel():
-    def __init__(self, settlementDate, curve, currency):
+    def __init__(self, settlementDate, curve):
         """
         Initialize a Hull-White model for interest rate simulation.
 
@@ -192,11 +192,8 @@ class HullWhiteModel():
             The settlement date for the model
         curve : ql.YieldTermStructure
             The yield curve for the model
-        currency : str
-            The currency for the model
         """
         self.curve = curve
-        self.currency = currency
         self.settlementDate = settlementDate
         self.model = None
 
@@ -226,7 +223,7 @@ class HullWhiteModel():
         term_structure = ql.YieldTermStructureHandle(self.curve)
         model = ql.HullWhite(term_structure)
         engine = ql.JamshidianSwaptionEngine(model)
-        helpers = create_swaption_helper(self.currency, swaption, self.curve, engine)
+        helpers = create_swaption_helper(swaption, self.curve, engine)
 
         optimization_method = ql.LevenbergMarquardt(1.0e-8,1.0e-8,1.0e-8)
         end_criteria = ql.EndCriteria(10000, 100, 1e-6, 1e-8, 1e-8)

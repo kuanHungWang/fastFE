@@ -62,8 +62,8 @@ df_swaption = get_swaption('USD', ['2Y', '3Y'], ['5Y', '5Y'])
 
 
 # Step 3. Create curve and model, use previously created market data as input and calibration data.
-curve = bootstrap_curve('USD', today, deposit=df_deposit, swap=df_swap)
-hw_model = HullWhiteModel(today, curve, 'USD')
+curve = bootstrap_curve(today, deposit=df_deposit, swap=df_swap)
+hw_model = HullWhiteModel(today, curve)
 hw_model.calibrate(df_swaption)
 
 # Step 4. Create Schedules

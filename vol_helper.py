@@ -231,10 +231,11 @@ def _create_TWD_swaption_helpers(df: pd.DataFrame, curve, engine=None):
     floating_leg_conventions = Conventions.TWDFloatingLegConventions()
     return _create_swaption_helper(df, curve, engine, fixed_leg_conventions, floating_leg_conventions)
 
-def create_swaption_helper(currency: Literal['USD', 'EUR', 'JPY', 'GBP', 'CHF', 'TWD'], 
+def create_swaption_helper(
                         df: pd.DataFrame, 
                         curve, 
-                        engine=None):
+                        engine=None,
+                        currency: Literal['USD', 'EUR', 'JPY', 'GBP', 'CHF', 'TWD']='USD'):
     """
     Create currency-specific swap rate helpers using predefined market conventions.
     
@@ -323,7 +324,7 @@ if __name__ == '__main__':
         'tenor': ['1Y', '2Y', '5Y', '7Y', '10Y']
     })
     
-    curve = bootstrap_curve('USD', today, deposit=df_deposit, swap=df_swap)
+    curve = bootstrap_curve(today, deposit=df_deposit, swap=df_swap)
     fixed_leg_conventions = Conventions.USFixedLegConventions()
     fixed_leg_conventions['tenor'] = ql.Period('1Y')
     floating_leg_conventions = Conventions.USFloatingLegConventions()
@@ -344,7 +345,7 @@ if __name__ == '__main__':
     swaption_helpers = _create_GBP_swaption_helpers(df_swaption, curve, engine)  # fast builder for GBP swaption without conventions
     swaption_helpers = _create_CHF_swaption_helpers(df_swaption, curve, engine)  # fast builder for CHF swaption without conventions
     swaption_helpers = _create_TWD_swaption_helpers(df_swaption, curve, engine)  # fast builder for TWD swaption without conventions
-    swaption_helpers = create_swaption_helper('USD', df_swaption, curve, engine)
+    swaption_helpers = create_swaption_helper(df_swaption, curve, engine)
 
     # heston model helper, use to calibrate heston model.
     heston_vol_df = pd.DataFrame({

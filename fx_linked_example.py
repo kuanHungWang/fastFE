@@ -71,8 +71,8 @@ eurusd_vol = get_volatility_surface('EUR', ['1M', '2M', '3M', '6M', '9M', '12M']
 
 
 # Step 3. Create curve and model, use previously created market data as input and calibration data.
-eur_yieldCurve = bootstrap_curve('EUR', today, deposit=eur_deposit, swap=eur_swap)
-usd_yieldCurve = bootstrap_curve('USD', today, deposit=usd_deposit, swap=usd_swap)
+eur_yieldCurve = bootstrap_curve(today, deposit=eur_deposit, swap=eur_swap)
+usd_yieldCurve = bootstrap_curve(today, deposit=usd_deposit, swap=usd_swap)
 vol_surface = create_black_vol_surface(eurusd_vol, today)
 spot = get_price('EUR')
 fx_model = GarmanKohlagenProcessModel(usd_yieldCurve, eur_yieldCurve, vol_surface, spot)

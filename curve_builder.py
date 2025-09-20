@@ -254,7 +254,7 @@ def _bootstrap_TWD_curve(settlementDate, deposit: pd.DataFrame=None, swap: pd.Da
     
     return bootstrap_curve_with_instrument_helpers(settlementDate, helpers, dayCount)
 
-def bootstrap_curve(currency: Literal['USD', 'EUR', 'JPY', 'GBP', 'TWD'], settlementDate, deposit: pd.DataFrame=None, swap: pd.DataFrame=None, OIS: pd.DataFrame=None, FRA: pd.DataFrame=None, method: Literal['logLinearDiscount', 'logCubicDiscount','linearZero','cubicZero', 'linearForward','splineCubicDiscount']='linearZero'):
+def bootstrap_curve(settlementDate, deposit: pd.DataFrame=None, swap: pd.DataFrame=None, OIS: pd.DataFrame=None, FRA: pd.DataFrame=None, method: Literal['logLinearDiscount', 'logCubicDiscount','linearZero','cubicZero', 'linearForward','splineCubicDiscount']='linearZero',currency: Literal['USD', 'EUR', 'JPY', 'GBP', 'TWD']='USD'):
     """
     Bootstrap a yield curve using various market instruments.
     
