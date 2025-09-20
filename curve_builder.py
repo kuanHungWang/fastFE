@@ -254,7 +254,7 @@ def _bootstrap_TWD_curve(settlementDate, deposit: pd.DataFrame=None, swap: pd.Da
     
     return bootstrap_curve_with_instrument_helpers(settlementDate, helpers, dayCount)
 
-def bootstrap_curve(settlementDate, deposit: pd.DataFrame=None, swap: pd.DataFrame=None, OIS: pd.DataFrame=None, FRA: pd.DataFrame=None, method: Literal['logLinearDiscount', 'logCubicDiscount','linearZero','cubicZero', 'linearForward','splineCubicDiscount']='linearZero',currency: Literal['USD', 'EUR', 'JPY', 'GBP', 'TWD']='USD'):
+def bootstrap_curve(settlementDate, deposit: pd.DataFrame=None, swap: pd.DataFrame=None, OIS: pd.DataFrame=None, FRA: pd.DataFrame=None, method: Literal['logLinearDiscount', 'logCubicDiscount','linearZero','cubicZero', 'linearForward','splineCubicDiscount']='linearZero',currency: Literal['USD', 'EUR', 'JPY', 'GBP', 'TWD']='USD') -> ql.YieldTermStructureHandle: 
     """
     Bootstrap a yield curve using various market instruments.
     
@@ -327,7 +327,8 @@ def bootstrap_curve(settlementDate, deposit: pd.DataFrame=None, swap: pd.DataFra
         fra_helpers = create_fra_rate_helpers(FRA, floating_leg_conventions)
         helpers+=fra_helpers
 
-    return bootstrap_curve_with_instrument_helpers(settlementDate, helpers, dayCount, method)
+    curve = bootstrap_curve_with_instrument_helpers(settlementDate, helpers, dayCount, method)
+    return ql.YieldTermStructureHandle(curve)
 
 
     
@@ -353,12 +354,12 @@ if __name__ == '__main__':
     curve = _bootstrap_JPY_curve(today, deposit=df_deposit, swap=df_swap)  # fast builder for JPY curve without conventions
     curve = _bootstrap_GBP_curve(today, deposit=df_deposit, swap=df_swap)  # fast builder for GBP curve without conventions
     curve = _bootstrap_TWD_curve(today, deposit=df_deposit, swap=df_swap)  # fast builder for TWD curve without conventions
-    curve = bootstrap_curve('USD', today, deposit=df_deposit, swap=df_swap)  # fast builder for USD curve without conventions
-    curve = bootstrap_curve('EUR', today, deposit=df_deposit, swap=df_swap)  # fast builder for EUR curve without conventions
-    curve = bootstrap_curve('JPY', today, deposit=df_deposit, swap=df_swap)  # fast builder for JPY curve without conventions
-    curve = bootstrap_curve('GBP', today, deposit=df_deposit, swap=df_swap)  # fast builder for GBP curve without conventions
-    curve = bootstrap_curve('TWD', today, deposit=df_deposit, swap=df_swap)  # fast builder for TWD curve without conventions
-    curve = bootstrap_curve('CHF', today, deposit=df_deposit, swap=df_swap)  # fast builder for CHF curve without conventions
+    curve = bootstrap_curve(today, deposit=df_deposit, swap=df_swap, currency='USD')  # fast builder for USD curve without conventions
+    curve = bootstrap_curve(today, deposit=df_deposit, swap=df_swap, currency='EUR')  # fast builder for EUR curve without conventions
+    curve = bootstrap_curve(today, deposit=df_deposit, swap=df_swap, currency='JPY')  # fast builder for JPY curve without conventions
+    curve = bootstrap_curve(today, deposit=df_deposit, swap=df_swap, currency='GBP')  # fast builder for GBP curve without conventions
+    curve = bootstrap_curve(today, deposit=df_deposit, swap=df_swap, currency='TWD')  # fast builder for TWD curve without conventions
+    curve = bootstrap_curve(today, deposit=df_deposit, swap=df_swap, currency='CHF')  # fast builder for CHF curve without conventions
     schedule = ql.MakeSchedule(today, today + ql.Period(3, ql.Months), ql.Period('1W'))
 
 

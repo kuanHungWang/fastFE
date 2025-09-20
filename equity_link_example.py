@@ -85,7 +85,7 @@ yieldCurve = bootstrap_curve(today, deposit=df_deposit, swap=df_swap)
 # Equity market data: spot price and dividend information
 spot = get_price('AAPL')
 dividend_rate = get_dividend_rate('AAPL')
-dividendCurve = ql.FlatForward(today, dividend_rate, ql.Actual365Fixed())
+dividendCurve = ql.YieldTermStructureHandle(ql.FlatForward(today, dividend_rate, ql.Actual365Fixed()))
 heston_model = HestonModel(yieldCurve, dividendCurve, calendar)
 heston_model.calibrate(df_heston_vol, spot)
 
@@ -125,7 +125,7 @@ print(f'equity_fixings: \n{equity_fixings}')
 discountFactors = [yieldCurve.discount(d) for d in paymentSchedule]
 discountFactors = pd.DataFrame(discountFactors, index=paymentSchedule)
 print(f'discountFactors: \n{discountFactors}')
-libor_index = ql.IborIndex('MyIndex', ql.Period('6m'), 2, currency, calendar, date_rolling_convention, True, libor_dayCount, ql.YieldTermStructureHandle(yieldCurve))
+libor_index = ql.IborIndex('MyIndex', ql.Period('6m'), 2, currency, calendar, date_rolling_convention, True, libor_dayCount, yieldCurve)
 libor_fixings = [libor_index.fixing(d) for d in fixingSchedule]
 libor_fixings = pd.DataFrame(libor_fixings, paymentSchedule)
 if fixing_in_advance:

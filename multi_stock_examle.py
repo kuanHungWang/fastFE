@@ -90,11 +90,11 @@ corrMatrix = [[1, 0.5], [0.5, 1]]
 # Step 3. Create curves and models, use previously created market data as input.
 
 riskFreeCurve = bootstrap_curve(today, deposit=df_deposit, swap=df_swap)
-dividendCurve_AAPL = ql.FlatForward(today, dividend_rate_AAPL, dayCount)  # Usually don't use flat curve in real world, just simplify for example.
+dividendCurve_AAPL = ql.YieldTermStructureHandle(ql.FlatForward(today, dividend_rate_AAPL, dayCount))  # Usually don't use flat curve in real world, just simplify for example.
 vol_surface_AAPL = create_black_vol_surface(df_vol_surface_AAPL, today)
 black_model_vol_surface_AAPL = BlackScholesMertonModel(riskFreeCurve, dividendCurve_AAPL, vol_surface_AAPL, spot_AAPL)
 
-dividendCurve_MSFT = ql.FlatForward(today, dividend_rate_MSFT, dayCount)  # Usually don't use flat curve in real world, just simplify for example.
+dividendCurve_MSFT = ql.YieldTermStructureHandle(ql.FlatForward(today, dividend_rate_MSFT, dayCount))  # Usually don't use flat curve in real world, just simplify for example.
 vol_surface_MSFT = create_black_vol_surface(df_vol_surface_MSFT, today)
 black_model_vol_surface_MSFT = BlackScholesMertonModel(riskFreeCurve, dividendCurve_MSFT, vol_surface_MSFT, spot_MSFT)
 
@@ -144,7 +144,7 @@ print(f'\nfixed_cashflows: \n{fixed_cashflows}')
 discountFactors = [riskFreeCurve.discount(d) for d in paymentSchedule]
 discountFactors = pd.DataFrame(discountFactors, index=paymentSchedule)
 print(f'discountFactors: \n{discountFactors}')
-libor_index = ql.IborIndex('MyIndex', ql.Period('6m'), 2, currency, calendar, date_rolling_convention, True, libor_dayCount, ql.YieldTermStructureHandle(riskFreeCurve))
+libor_index = ql.IborIndex('MyIndex', ql.Period('6m'), 2, currency, calendar, date_rolling_convention, True, libor_dayCount, riskFreeCurve)
 libor_fixings = [libor_index.fixing(d) for d in fixingSchedule]
 libor_fixings = pd.DataFrame(libor_fixings, paymentSchedule)
 if fixing_in_advance:

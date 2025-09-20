@@ -36,7 +36,7 @@ def create_black_vol_curve(vol_curve: pd.Series, reference_date:ql.Date, dayCoun
 
     volatilityCurve = ql.BlackVarianceCurve(reference_date, expirations, volatilities, dayCount)
     volatilityCurve.enableExtrapolation()
-    return volatilityCurve
+    return ql.BlackVolTermStructureHandle(volatilityCurve)
 
 def create_black_vol_surface(df: pd.DataFrame, reference_date:ql.Date, dayCount:ql.DayCounter=ql.Actual365Fixed(), calendar=ql.WeekendsOnly()):
     """
@@ -75,9 +75,9 @@ def create_black_vol_surface(df: pd.DataFrame, reference_date:ql.Date, dayCount:
             volMatrix[i][j] = df.iloc[i,j]
     volatilitySurface = ql.BlackVarianceSurface(reference_date, calendar, expirations, strikes, volMatrix, dayCount)
     volatilitySurface.enableExtrapolation()
-    return volatilitySurface
+    return ql.BlackVolTermStructureHandle(volatilitySurface)
 
-def create_heston_model_helper(df: pd.DataFrame, spot:float, yield_curve, dividend_curve, calendar=ql.NullCalendar(), engine=None):
+def create_heston_model_helper(df: pd.DataFrame, spot:float, yield_curve:ql.YieldTermStructure, dividend_curve:ql.YieldTermStructure, calendar=ql.NullCalendar(), engine=None):
     """
     Create a list of QuantLib HestonModelHelper objects from a DataFrame containing option market data.
     
@@ -107,8 +107,8 @@ def create_heston_model_helper(df: pd.DataFrame, spot:float, yield_curve, divide
         
    
     """
-    yield_curve_handler = ql.YieldTermStructureHandle(yield_curve)
-    dividend_curve_handler = ql.YieldTermStructureHandle(dividend_curve)
+    yield_curve_handler = yield_curve
+    dividend_curve_handler = dividend_curve
     helpers = []
 
     for _, row in df.iterrows():
@@ -182,7 +182,7 @@ def _create_swaption_helper(df, curve, engine=None, fixed_leg_conventions=None, 
         length = ql.Period(length)
         volatility = ql.QuoteHandle(ql.SimpleQuote(volatility))
 
-        yts = ql.YieldTermStructureHandle(curve)
+        yts = curve
         index = ql.IborIndex('iborIndex', floatingFrequency, floatingSettlementDays, currency, calendar, floatingConvention, floatingEndOfMonth, floatingDayCount, yts)
         helper= ql.SwaptionHelper(
         maturity, length, volatility, index, fixedLegTenor,
@@ -333,7 +333,7 @@ if __name__ == '__main__':
         'length': ['5Y', '5Y'],
         'volatility': [0.0055, 0.0055]
     })
-    term_structure = ql.YieldTermStructureHandle(curve)
+    term_structure = curve
     model = ql.HullWhite(term_structure);
     engine = ql.JamshidianSwaptionEngine(model)
 
@@ -355,7 +355,7 @@ if __name__ == '__main__':
     }) 
     spot = 0.02
     dayCount = ql.Actual365Fixed()
-    riskFreeCurve = ql.FlatForward(today, 0.04, dayCount)
-    dividendCurve = ql.FlatForward(today, 0.01, dayCount)
+    riskFreeCurve = ql.YieldTermStructureHandle(ql.FlatForward(today, 0.04, dayCount))
+    dividendCurve = ql.YieldTermStructureHandle(ql.FlatForward(today, 0.01, dayCount))
 
     heston_helpers = create_heston_model_helper(heston_vol_df, spot, riskFreeCurve, dividendCurve)

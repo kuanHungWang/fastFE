@@ -55,9 +55,9 @@ class GarmanKohlagenProcessModel():
         self.domesticRiskFreeCurve = domesticRiskFreeCurve
         self.vol_curve=vol_curve
         self.initialValue = initialValue
-        foreignRisk_ts = ql.YieldTermStructureHandle(foreignRiskCurve)
-        domesticRiskFree_ts = ql.YieldTermStructureHandle(domesticRiskFreeCurve)
-        vol_ts = ql.BlackVolTermStructureHandle(vol_curve)
+        foreignRisk_ts = foreignRiskCurve
+        domesticRiskFree_ts = domesticRiskFreeCurve
+        vol_ts = vol_curve
         initialValue = ql.QuoteHandle(ql.SimpleQuote(self.initialValue))
         
         process = ql.GarmanKohlagenProcess(initialValue, foreignRisk_ts, domesticRiskFree_ts, vol_ts)
@@ -130,9 +130,9 @@ class BlackScholesMertonModel():
         self.dividend_curve = dividend_curve
         self.vol_curve=vol_curve
         self.initialValue = initialValue
-        yield_ts = ql.YieldTermStructureHandle(yield_curve)
-        dividend_ts = ql.YieldTermStructureHandle(dividend_curve)
-        vol_ts = ql.BlackVolTermStructureHandle(vol_curve)
+        yield_ts = yield_curve
+        dividend_ts = dividend_curve
+        vol_ts = vol_curve
         initialValue = ql.QuoteHandle(ql.SimpleQuote(self.initialValue))
         
         process = ql.BlackScholesMertonProcess(initialValue, dividend_ts, yield_ts, vol_ts)
@@ -220,7 +220,7 @@ class HullWhiteModel():
 
 
 
-        term_structure = ql.YieldTermStructureHandle(self.curve)
+        term_structure = self.curve
         model = ql.HullWhite(term_structure)
         engine = ql.JamshidianSwaptionEngine(model)
         helpers = create_swaption_helper(swaption, self.curve, engine)
@@ -274,7 +274,7 @@ class HullWhiteModel():
         """
         
         a, sigma = self.model.params()
-        term_structure = ql.YieldTermStructureHandle(self.curve)
+        term_structure = self.curve
         process = ql.HullWhiteProcess(term_structure, a, sigma)
 
 
@@ -304,9 +304,9 @@ class HullWhiteModel():
             underlying = values[0]
             underlying = [s for s in underlying]
             underlying_path.append(underlying)
-            fwd_crv = ql.ForwardCurve([d for d in all_dates], underlying, dayCount)
+            fwd_crv = ql.YieldTermStructureHandle(ql.ForwardCurve([d for d in all_dates], underlying, dayCount))
             # print(f'fwd_crv start date: {fwd_crv.dates()[0]}, end date: {fwd_crv.dates()[-1]}')
-            ts = ql.YieldTermStructureHandle(fwd_crv)
+            ts = fwd_crv
             for index_factory, fixings in zip(index_factories, fixings_list):
                 index=index_factory(ts)
                 fixings.append([index.fixing(d) for d in fixingSchedule])
@@ -375,8 +375,8 @@ class HestonModel():
         sigma = 0.400
         rho = -0.15
         v0 = 0.02
-        yield_term_structure = ql.YieldTermStructureHandle(self.yield_curve)
-        dividend_term_structure = ql.YieldTermStructureHandle(self.dividend_curve)
+        yield_term_structure = self.yield_curve
+        dividend_term_structure = self.dividend_curve
         hestonProcess = ql.HestonProcess(yield_term_structure, dividend_term_structure, initialValue, v0, kappa, theta, sigma, rho)
         model = ql.HestonModel(hestonProcess)
         engine = ql.AnalyticHestonEngine(model)
@@ -404,12 +404,6 @@ class HestonModel():
         all_dates = ql.Schedule(fixingSchedule[0], fixingSchedule[-1], ql.Period('1d'), self.calendar, ql.Following, ql.Following, ql.DateGeneration.Backward, False)
         print(len(all_dates))
 
-        # Set up the Heston process
-        # parameters = self.model.params()
-        # yield_term_structure = ql.YieldTermStructureHandle(self.yield_curve)
-        # dividend_term_structure = ql.YieldTermStructureHandle(self.dividend_curve)
-        # initialValue = ql.QuoteHandle(ql.SimpleQuote(spot))
-        # process = ql.HestonProcess(yield_term_structure, dividend_term_structure, initialValue, *parameters)
         process = self.process
         # Time grid
         dayCount = ql.Actual365Fixed()
@@ -514,12 +508,12 @@ if __name__ == '__main__':
     dayCount = ql.Actual365Fixed()
     calendar = ql.WeekendsOnly()
     spot = 100
-    riskFreeCurve = ql.FlatForward(today, 0.04, dayCount)  # Usually don't use flat curve in real world, just simplify for example.
-    dividendCurve = ql.FlatForward(today, 0.01, dayCount)  # Usually don't use flat curve in real world, just simplify for example.
+    riskFreeCurve = ql.YieldTermStructureHandle(ql.FlatForward(today, 0.04, dayCount))  # Usually don't use flat curve in real world, just simplify for example.
+    dividendCurve = ql.YieldTermStructureHandle(ql.FlatForward(today, 0.01, dayCount))  # Usually don't use flat curve in real world, just simplify for example.
     black_vol_df = pd.Series([0.015, 0.018, 0.02, 0.022, 0.025], index=['1M', '2M', '3M', '6M', '9M'])
     
     # constant volatility
-    const_vol = ql.BlackConstantVol(today, calendar, 0.02, dayCount)
+    const_vol = ql.BlackVolTermStructureHandle(ql.BlackConstantVol(today, calendar, 0.02, dayCount))
     black_model_const_vol = BlackScholesMertonModel(riskFreeCurve, dividendCurve, const_vol, spot)
     # volatility curve
     vol_curve = create_black_vol_curve(black_vol_df, today)
@@ -548,8 +542,8 @@ if __name__ == '__main__':
         'vol': [0.015, 0.018, 0.02, 0.022, 0.025]
     })
     spot = 100
-    riskFreeCurve = ql.FlatForward(today, 0.04, dayCount)  # Usually don't use flat curve in real world, just simplify for example.
-    dividendCurve = ql.FlatForward(today, 0.01, dayCount)  # Usually don't use flat curve in real world, just simplify for example.
+    riskFreeCurve = ql.YieldTermStructureHandle(ql.FlatForward(today, 0.04, dayCount))  # Usually don't use flat curve in real world, just simplify for example.
+    dividendCurve = ql.YieldTermStructureHandle(ql.FlatForward(today, 0.01, dayCount))  # Usually don't use flat curve in real world, just simplify for example.
     heston_model = HestonModel(riskFreeCurve, dividendCurve, calendar)
     heston_model.calibrate(heston_vol_df, spot)
     fixingSchedule = ql.Schedule(today, today + ql.Period('1Y'), ql.Period('1M'), calendar, ql.Following, ql.Following, ql.DateGeneration.Backward, False)
@@ -564,11 +558,11 @@ if __name__ == '__main__':
     dayCount = ql.Actual365Fixed()
     calendar = ql.WeekendsOnly()
     spot = 1.3
-    domestic_curve = ql.FlatForward(today, 0.04, dayCount) # Usually don't use flat curve in real world, just simplify for example.
-    foreign_curve = ql.FlatForward(today, 0.05, dayCount) # Usually don't use flat curve in real world, just simplify for example.
+    domestic_curve = ql.YieldTermStructureHandle(ql.FlatForward(today, 0.04, dayCount)) # Usually don't use flat curve in real world, just simplify for example.
+    foreign_curve = ql.YieldTermStructureHandle(ql.FlatForward(today, 0.05, dayCount)) # Usually don't use flat curve in real world, just simplify for example.
     
     # constant volatility
-    const_vol = ql.BlackConstantVol(today, calendar, 0.2, dayCount) # Usually don't use flat curve in real world, just simplify for example.
+    const_vol = ql.BlackVolTermStructureHandle(ql.BlackConstantVol(today, calendar, 0.2, dayCount)) # Usually don't use flat curve in real world, just simplify for example.
     fxModel = GarmanKohlagenProcessModel(foreign_curve, domestic_curve, const_vol, spot)
     
     # volatility curve

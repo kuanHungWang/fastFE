@@ -375,10 +375,10 @@ endOfMonth = False
 settlementDays = 2
 dayCounter = ql.Actual360()
 currency = ql.USDCurrency()
-ibor_index = ql.IborIndex('MyIborIndex', ql.Period('6m'), settlementDays, currency, calendar, ql.Following, endOfMonth, dayCounter, ql.YieldTermStructureHandle(yieldCurve))
-euribor_index = ql.Euribor(ql.Period('6M'), ql.YieldTermStructureHandle(yieldCurve))
-overnight_index = ql.OvernightIndex('MyOvernightIndex', settlementDays, currency, calendar, dayCounter, ql.YieldTermStructureHandle(yieldCurve))
-cms10Y =ql.UsdLiborSwapIsdaFixAm(ql.Period('10Y'), ql.YieldTermStructureHandle(yieldCurve))
+ibor_index = ql.IborIndex('MyIborIndex', ql.Period('6m'), settlementDays, currency, calendar, ql.Following, endOfMonth, dayCounter, yieldCurve)
+euribor_index = ql.Euribor(ql.Period('6M'), yieldCurve)
+overnight_index = ql.OvernightIndex('MyOvernightIndex', settlementDays, currency, calendar, dayCounter, yieldCurve)
+cms10Y =ql.UsdLiborSwapIsdaFixAm(ql.Period('10Y'), yieldCurve)
 
 
 #@Description
@@ -386,7 +386,7 @@ cms10Y =ql.UsdLiborSwapIsdaFixAm(ql.Period('10Y'), ql.YieldTermStructureHandle(y
 keywords: fixing, index fixing, index value"""
 #@code
 yieldCurve = ql.FlatForward(today, 0.04, ql.Actual365Fixed()) # In real world we usually don't use flat forward curve, here just for example.
-ibor_index = ql.IborIndex('MyIborIndex', ql.Period('6m'), settlementDays, currency, calendar, ql.Following, endOfMonth, dayCounter, ql.YieldTermStructureHandle(yieldCurve))
+ibor_index = ql.IborIndex('MyIborIndex', ql.Period('6m'), settlementDays, currency, calendar, ql.Following, endOfMonth, dayCounter, yieldCurve)
 date = calendar.advance(today,ql.Period(2, ql.Days))
 libor_fixings = ibor_index.fixing(date)
 
@@ -404,7 +404,7 @@ discount_factor = yieldCurve.discount(date)
 keywords: deterministic floating cashflow, libor index, deterministic interest rate environment"""
 #@code
 yieldCurve = ql.FlatForward(today, 0.04, ql.Actual365Fixed())  # In real world we usually don't use flat forward curve, here just for example.
-libor_index = ql.IborIndex('MyIborIndex', ql.Period('6m'), settlementDays, currency, calendar, ql.Following, endOfMonth, dayCounter, ql.YieldTermStructureHandle(yieldCurve))
+libor_index = ql.IborIndex('MyIborIndex', ql.Period('6m'), settlementDays, currency, calendar, ql.Following, endOfMonth, dayCounter, yieldCurve)
 libor_fixings = [libor_index.fixing(d) for d in fixingSchedule]  # get fixing values for each fixing date from index using .fixing() method
 libor_fixings = pd.DataFrame(libor_fixings, paymentSchedule)  # convert to pandas DataFrame for easy manipulation, notes that we use paymentSchedule as index, not fixingSchedule, in order to align with other cashflow, discount factor, etc.
 if fixing_in_advance:

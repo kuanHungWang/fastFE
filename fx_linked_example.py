@@ -74,6 +74,7 @@ eurusd_vol = get_volatility_surface('EUR', ['1M', '2M', '3M', '6M', '9M', '12M']
 eur_yieldCurve = bootstrap_curve(today, deposit=eur_deposit, swap=eur_swap)
 usd_yieldCurve = bootstrap_curve(today, deposit=usd_deposit, swap=usd_swap)
 vol_surface = create_black_vol_surface(eurusd_vol, today)
+print(type(vol_surface))
 spot = get_price('EUR')
 fx_model = GarmanKohlagenProcessModel(usd_yieldCurve, eur_yieldCurve, vol_surface, spot)
 
@@ -105,7 +106,7 @@ fx_fixing = fx_model.monte_carlo_paths(daily_fixing_days, numPaths=n_paths)
 discountFactors = [eur_yieldCurve.discount(d) for d in paymentSchedule]
 discountFactors = pd.DataFrame(discountFactors, index=paymentSchedule)
 print(f'discountFactors: \n{discountFactors}')
-libor_index = ql.IborIndex('MyIndex', ql.Period('6m'), 2, ql.EURCurrency(), calendar, date_rolling_convention, True, libor_dayCount, ql.YieldTermStructureHandle(eur_yieldCurve))
+libor_index = ql.IborIndex('MyIndex', ql.Period('6m'), 2, ql.EURCurrency(), calendar, date_rolling_convention, True, libor_dayCount, eur_yieldCurve)
 libor_fixings = [libor_index.fixing(d) for d in liborFixingSchedule]
 libor_fixings = pd.DataFrame(libor_fixings, paymentSchedule)
 if fixing_in_advance:
