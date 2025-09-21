@@ -79,7 +79,7 @@ def create_ibor_6M(ts):
     return ql.IborIndex('MyIndex', ql.Period('6m'), 2, currency, calendar, date_rolling_convention, True, dayCount, ts)
 
 n_path = 6
-underlying_path, fixings, discountFactors = hw_model.monte_carlo_paths([create_ibor_6M], fixingSchedule, paymentSchedule, n_path)
+underlying_path, fixings, discountFactors = hw_model.monte_carlo_paths({'libor_6M': create_ibor_6M}, fixingSchedule, paymentSchedule, n_path)
 # notes: 
 # 1. the resulting underlying_path, fixings, discountFactors are dataframes with index of ql.Date.
 # 2. fixings is a list of dataframes, each dataframe is the fixing of ibor index.
@@ -90,7 +90,7 @@ underlying_path, fixings, discountFactors = hw_model.monte_carlo_paths([create_i
 paySchedule = [d for d in paySchedule]
 recSchedule = [d for d in recSchedule]
 
-fixings=fixings[0]
+fixings=fixings['libor_6M']
 print(f'fixings: \n{fixings}')
 
 
@@ -127,15 +127,15 @@ net_cashflows = fixed_cashflows.values - floating_cashflows
 print(f'\nnet cashflows: \n{net_cashflows}')
 
 # prepare data for LSE
-single_period_dcf = discountFactors/discountFactors.shift(1)
+# single_period_dcf = discountFactors/discountFactors.shift(1)
 exercise_dates = paymentSchedule[1:-1]
 exercisable = subset_to_bool(exercise_dates, net_cashflows.index)  # convert from a list of dates to a boolean series
 observations = fixings  # observation is for linear estimator of longstaff schwartz, irelevant of fixing-in-advance or fixing-in-arrears
 exercise_payoff = lambda x: np.zeros(len(x))   # The cashflow of calling(cancelling) the IRS is 0.
 lse = LongstaffSchwartz(
-    cashflows=net_cashflows.iloc[1:], # remove first row
-    discountFactors=single_period_dcf,
-    exercise_schedule=exercisable,
+    cashflows=net_cashflows, # remove first row
+    discountFactors=discountFactors,
+    exercisable=exercisable,
     exercise_payoff=exercise_payoff,
     observable=observations
 )

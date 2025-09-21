@@ -7,7 +7,7 @@ import QuantLib as ql
 class LongstaffSchwartz():
     def __init__(self, cashflows: pd.DataFrame, 
                  discountFactors: pd.DataFrame, 
-                 exercise_schedule: pd.Series|List, 
+                 exercisable: pd.Series, 
                  exercise_payoff: Callable|np.ndarray|pd.DataFrame,
                  observable: pd.DataFrame):
 
@@ -19,7 +19,7 @@ class LongstaffSchwartz():
         cashflows : pd.DataFrame
             The net cashflows of a financial contract before applying discounting and early exercise (index: time, columns: path)
         discountFactors : pd.DataFrame
-            Discount factor for one time period (from t to t-1), not discount to t0, for interest rate model, it has multiple column like cashflow, otherwise, if using deterministic discounting, it has only one column.
+            Discount factor, for interest rate model, it has multiple column like cashflow, otherwise, if using deterministic discounting, it has only one column.
         exercise_schedule : pd.Series|List
             The early exercise schedule, single column value, for panda series, index must the same as cashflows, and dtype is bool, representing exercisable or not.
         exercise_payoff : Callable|np.ndarray|pd.DataFrame
@@ -27,9 +27,10 @@ class LongstaffSchwartz():
         observable : pd.DataFrame
             The observable for least sqaure error estimation for early exercise, usually the fixing values of underling value.
         """
-        self.cashflows = cashflows
-        self.discountFactors = discountFactors
-        self.exercise_schedule = exercise_schedule
+        self.cashflows = cashflows.iloc[1:]
+        single_period_dcf = discountFactors/discountFactors.shift(1)  # Discount factor for one time period (from t to t-1), not discount to t0
+        self.discountFactors = single_period_dcf  
+        self.exercisable = exercisable
         self.observable = observable
         self.exercise_payoff_func = exercise_payoff
 
@@ -80,7 +81,7 @@ class LongstaffSchwartz():
             if verbose:
                 print(f'\nTime step {d}')
             current_cf = self.cashflows.loc[d]
-            if self.exercise_schedule.loc[d]:
+            if self.exercisable.loc[d]:
                 if verbose:
                     print('\n  Process exercise')
                     print(f'Valuation of future cf:')

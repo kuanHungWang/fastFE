@@ -166,15 +166,15 @@ print(f'\nnet cashflows: \n{net_cashflows}')  # note: the first row is 0, becaus
 # It is important to distinguish between callable/putable features and auto-call features. Callable (or putable, cancellable, Bermudan-style) options give the holder discretionary rights to exercise when advantageous, while auto-call features are triggered automatically when predetermined market conditions are met, without any discretionary decision.
 # The LongstaffSchwartz is specifically designed for Bermudan-style options. As for auto-call features, implement on your own according to the specific contract term sheet.
 
-single_period_dcf = discountFactors/discountFactors.shift(1)
+# single_period_dcf = discountFactors/discountFactors.shift(1)  # dcf of discounting one step back from current date
 
 exercisable = subset_to_bool(cancelSchedule, net_cashflows.index)  # convert from a list of dates to a boolean series
 observations = libor_fixings  # The input of linear estimator in longstaff schwartz, irelevant of fixing-in-advance or fixing-in-arrears, it is the available information at that time point to decide exercise or not.
 exercise_payoff = lambda x: np.zeros(len(x))   # The cashflow of calling(cancelling) the contract, in this case is 0.
 lse = LongstaffSchwartz(
-    cashflows=net_cashflows.iloc[1:], # remove first row
-    discountFactors=single_period_dcf,
-    exercise_schedule=exercisable,
+    cashflows=net_cashflows, # remove first row
+    discountFactors=discountFactors,
+    exercisable=exercisable,
     exercise_payoff=exercise_payoff,
     observable=observations
 )
