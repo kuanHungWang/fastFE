@@ -15,6 +15,16 @@ from market_data import (
     get_swap,
     get_swaption
 )
+from type_hint import (
+    ScheduleCreator,
+    CurveCreator,
+    IndexFactoriesCreator,
+    CashflowsCreator,
+    ExercisePayoffCreator,
+    ExerciseScheduleCreator,
+    DataFrameCreator
+)
+    
 
 # An example of interest rate linked product using Hull White model and monte carlo simulation to calculate fair value.
 # Product term sheet:
@@ -34,7 +44,7 @@ tenor = 4
 pay_frequency = '6M'
 rec_frequency = '1Y'
 cancel_frequency = '1Y'
-non_call_period = '2y'
+non_call_period = 2
 
 # number of paths for monte carlo simulation
 n_path = 6
@@ -44,90 +54,120 @@ calendar = ql.UnitedStates(ql.UnitedStates.Settlement)
 
 
 # set evaluation date
-today = ql.Date().todaysDate()
-today = calendar.advance(today,ql.Period(0, ql.Days))  # ensure today is a business day (In case of using in non-trading day)
-settlementDate = calendar.advance(today,ql.Period(2, ql.Days))
-ql.Settings.instance().evaluationDate = today
-print(f' trade date: {today}')
+valuationDate = ql.Date().todaysDate()
+valuationDate = calendar.advance(valuationDate,ql.Period(0, ql.Days))  # ensure today is a business day (In case of using in non-trading day)
+settlementDate = calendar.advance(valuationDate,ql.Period(2, ql.Days))
+ql.Settings.instance().evaluationDate = valuationDate
+print(f' trade date: {valuationDate}')
 print(f' settlement date: {settlementDate}')
 
 # Step 2. Prepare market data, including data to bootstrap curve and data to calibrate model.
 # For this example, we use deposit and swap data to bootstrap curve, and swaption data to calibrate Hull White model.
 # Market data to bootstrap curve.
-df_deposit = get_deposit('USD', ['1M', '2M', '3M', '6M', '9M'])
-df_swap = get_swap('USD', ['1Y', '2Y', '5Y', '7Y', '10Y', '15Y', '20Y', '25Y', '30Y'])
 
-# swaption data to calibrate Hull White model
-df_swaption = get_swaption('USD', ['2Y', '3Y'], ['5Y', '5Y'])
+def CreateUSDCurve():
+    df_deposit = get_deposit('USD', ['1M', '2M', '3M', '6M', '9M'])
+    df_swap = get_swap('USD', ['1Y', '2Y', '5Y', '7Y', '10Y', '15Y', '20Y', '25Y', '30Y'])
+
+    # swaption data to calibrate Hull White model
 
 
-# Step 3. Create curve and model, use previously created market data as input and calibration data.
-curve = bootstrap_curve(today, deposit=df_deposit, swap=df_swap)
-hw_model = HullWhiteModel(today, curve)
+    # Step 3. Create curve and model, use previously created market data as input and calibration data.
+    curve = bootstrap_curve(valuationDate, deposit=df_deposit, swap=df_swap)
+    return curve
+def CreateUSDSwaptionData():
+    return get_swaption('USD', ['2Y', '3Y'], ['5Y', '5Y'])
+create_usd_curve: CurveCreator = CreateUSDCurve
+create_usd_swaption_data: DataFrameCreator = CreateUSDSwaptionData
+
+df_swaption = create_usd_swaption_data()
+curve = create_usd_curve()
+hw_model = HullWhiteModel(valuationDate, curve)
 hw_model.calibrate(df_swaption)
 
-# Step 4. Create Schedules
-# For structured product, typically we need to create payment schedule and fixing schedule. For payment schedule, create multiple ones if needed for different legs, but always merge to one schedule.
-# In this example:  
-# For payment schedule, we need to create two schedules for fixed leg(yearly) and floating leg(semi-annual).
-# For fixing schedule, we need to create a schedule which is 2 business days before payment date.
-date_rolling_convention = ql.ModifiedFollowing
-date_termination_convention = ql.ModifiedFollowing
-pay_frequency = ql.Period(pay_frequency)
-rec_frequency = ql.Period(rec_frequency)
+
 dayCount = ql.Thirty360(ql.Thirty360.USA)
-rule = ql.DateGeneration.Forward
-terminationDate = calendar.advance(settlementDate, ql.Period(tenor, ql.Years))
-endOfMonth = calendar.isEndOfMonth(terminationDate)
-paySchedule = ql.Schedule(settlementDate, terminationDate, pay_frequency, calendar, date_rolling_convention, date_termination_convention, rule, endOfMonth)
-recSchedule = ql.Schedule(settlementDate, terminationDate, rec_frequency, calendar, date_rolling_convention, date_termination_convention, rule, endOfMonth)
-# Note: the schedule created by ql.Schedule include settlement date, this behavior cowork with year_fraction() which always has 0 in first value.
-paymentSchedule = combine_schedule(paySchedule, recSchedule)  # merge two schedules
+
+def CreatePaymentSchedule():
+    date_rolling_convention = ql.ModifiedFollowing
+    date_termination_convention = ql.ModifiedFollowing
+    pay_frequency = ql.Period(pay_frequency)
+    rec_frequency = ql.Period(rec_frequency)
+    
+    rule = ql.DateGeneration.Forward
+    terminationDate = calendar.advance(settlementDate, ql.Period(tenor, ql.Years))
+    endOfMonth = calendar.isEndOfMonth(terminationDate)
+    paySchedule = ql.Schedule(settlementDate, terminationDate, pay_frequency, calendar, date_rolling_convention, date_termination_convention, rule, endOfMonth)
+    recSchedule = ql.Schedule(settlementDate, terminationDate, rec_frequency, calendar, date_rolling_convention, date_termination_convention, rule, endOfMonth)
+    # Note: the schedule created by ql.Schedule include settlement date, this behavior cowork with year_fraction() which always has 0 in first value.
+    paymentSchedule = combine_schedule(paySchedule, recSchedule)  # merge two schedules
+    return paymentSchedule
+
+def CreateFixingSchedule():
+    date_rolling_convention = ql.ModifiedFollowing
+    date_termination_convention = ql.ModifiedFollowing
+    frequency = ql.Period(pay_frequency)
+    rule = ql.DateGeneration.Forward
+    endOfMonth = calendar.isEndOfMonth(settlementDate)
+    terminationDate = calendar.advance(settlementDate, ql.Period(tenor, ql.Years))
+    endOfMonth = calendar.isEndOfMonth(terminationDate)
+    paymentSchedule = ql.Schedule(settlementDate, terminationDate, frequency, calendar, date_rolling_convention, date_termination_convention, rule, endOfMonth)
+
+    fixingSchedule = [calendar.advance(d, ql.Period(-2, ql.Days)) for d in paymentSchedule]  # fixing schedule(2 business days before payment date)
+    return fixingSchedule
 
 
-fixingSchedule = [calendar.advance(d, ql.Period(-2, ql.Days)) for d in paySchedule]  # fixing schedule(2 business days before payment date)
+create_payment_schedule: ScheduleCreator = CreatePaymentSchedule
+create_fixing_schedule: ScheduleCreator = CreateFixingSchedule
+paymentSchedule = create_payment_schedule()
+fixingSchedule = create_fixing_schedule()
 # convert original quantlib schedule object to list to use in pandas index.
 paySchedule = [d for d in paySchedule]
 recSchedule = [d for d in recSchedule]
-cancel_start_date = calendar.advance(settlementDate, ql.Period(non_call_period))
-cancel_frequency = ql.Period(cancel_frequency)
-cancelSchedule = ql.Schedule(cancel_start_date, terminationDate, cancel_frequency, calendar, date_rolling_convention, date_termination_convention, rule, endOfMonth)
-cancelSchedule = [d for d in cancelSchedule][: -1]  
-print(f'recSchedule: {recSchedule}')
-print(f'paySchedule: {paySchedule}')
-print(f'paymentSchedule: {paymentSchedule}')
-print(f'fixingSchedule: {fixingSchedule}')
-print(f'cancelSchedule: {cancelSchedule}')
-# Notes: no need to convert ql.Date to pd.Timestamp, because pd.DataFrame can handle ql.Date as index.
 
 
-# Step 5. Generate net cashflows by monte carlo simulation before discounting and early exercise
-# Use previously created model object to generate paths of underlying fixing values and discount factors.
-# Then apply the fixing values to calculate cashflows according to the contract term sheet.
-# The net cashflow object shall be a pandas.DataFrame, with payment date as index and each column is a path of cashflows.
-# The output of this step will be further used in Longstaff-Schwartz method to calculate the fair value of the contract.
-# For other cases, if there is no early exercise, distcount net cashflow to present value then we have fair value and confidence interval.
+def CreateCancelSchedule():
+    date_rolling_convention = ql.ModifiedFollowing
+    date_termination_convention = ql.ModifiedFollowing
+    rule = ql.DateGeneration.Forward
+    endOfMonth = calendar.isEndOfMonth(terminationDate)
+    terminationDate = calendar.advance(settlementDate, ql.Period(tenor, ql.Years))
+    cancel_start_date = calendar.advance(settlementDate, ql.Period(non_call_period))
+    cancel_frequency = ql.Period(cancel_frequency)
+    payment_frequency = ql.Period(pay_frequency)
+    paymentSchedule = ql.Schedule(settlementDate, terminationDate, payment_frequency, calendar, date_rolling_convention, date_termination_convention, rule, endOfMonth)
+    paymentSchedule = [d for d in paymentSchedule]
+    exercisable = pd.Series(index=paymentSchedule, data=True)
+    for i in range(non_call_period):
+        exercisable.iloc[i] = False
+    exercisable.iloc[-1] = False
 
+    return exercisable
+create_cancel_schedule: ScheduleCreator = CreateCancelSchedule
+exercisable = create_cancel_schedule()
 
-
-# create index factory as input of monte carlo paths generators.
-# In the example, we use Libor 6M, CMS 5Y, Libor 2Y as underlying fixing values.
-def create_ibor_6M(ts):
-    return ql.IborIndex('Libor_6M', ql.Period('6m'), 2, ql.USDCurrency(), calendar, date_rolling_convention, True, dayCount, ts)
-def create_cms_5Y(ts):
-    return ql.UsdLiborSwapIsdaFixAm(ql.Period('5y'), ts)
-def create_ibor_2Y(ts):
-    return ql.UsdLiborSwapIsdaFixAm(ql.Period('2y'), ts)
-index_factories = {'libor_6M': create_ibor_6M, 'cms_5Y': create_cms_5Y, 'libor_2Y': create_ibor_2Y}
+def CreateIndexFactories():
+    def create_ibor_6M(ts):
+        return ql.IborIndex('Libor_6M', ql.Period('6m'), 2, ql.USDCurrency(), calendar, date_rolling_convention, True, dayCount, ts)
+    def create_cms_5Y(ts):
+        return ql.UsdLiborSwapIsdaFixAm(ql.Period('5y'), ts)
+    def create_ibor_2Y(ts):
+        return ql.UsdLiborSwapIsdaFixAm(ql.Period('2y'), ts)
+    return [create_ibor_6M, create_cms_5Y, create_ibor_2Y]
+create_index_factories: IndexFactoriesCreator = CreateIndexFactories
+index_factories = create_index_factories()
 # generate paths of fixing value and discount factor by Hull White model
-underlying_path, fixings, discountFactors = hw_model.monte_carlo_paths(index_factories=index_factories, fixingSchedule=fixingSchedule, paymentSchedule=paymentSchedule, numPaths=n_path)
-libor_fixings=fixings['libor_6M']  
-cms_5Y_fixings=fixings['cms_5Y']
-cms_2Y_fixings=fixings['libor_2Y']
+underlying_path, fixings, discountFactors = hw_model.monte_carlo_paths(index_factories=create_index_factories(), fixingSchedule=fixingSchedule, paymentSchedule=paymentSchedule, numPaths=n_path)
 
-print(f'paths of libor fixings: \n{libor_fixings}')
-print(f'paths of cms 5Y fixings: \n{cms_5Y_fixings}')
-print(f'paths of cms 2Y fixings: \n{cms_2Y_fixings}')
+
+
+
+libor_fixings=fixings[0]  
+cms_5Y_fixings=fixings[1]
+cms_2Y_fixings=fixings[2]
+
+
+
 
 # Libor cashflows
 # Get fixing rate applies to each corresponding payment date.

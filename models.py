@@ -1,7 +1,7 @@
 import QuantLib as ql
 import pandas as pd
 import numpy as np
-from typing import List, Callable
+from typing import List, Callable, Dict, Literal
 from vol_helper import (
     create_swaption_helper,
     create_heston_model_helper,
@@ -11,7 +11,7 @@ from vol_helper import (
 from util import year_fraction
 from market_data import get_volatility_surface
 
-
+from type_hint import IndexFactory, Schedule
 
 def calibration_detail(helpers):
     """
@@ -34,7 +34,7 @@ def calibration_detail(helpers):
 
 class GarmanKohlagenProcessModel():
     
-    def __init__(self, foreignRiskCurve, domesticRiskFreeCurve, vol_curve, initialValue):
+    def __init__(self, foreignRiskCurve:ql.YieldTermStructureHandle, domesticRiskFreeCurve:ql.YieldTermStructureHandle, vol_curve:ql.BlackVarianceSurface, initialValue:Literal[float, ql.QuoteHandle]):
         """
         Initialize a Garman-Kohlhagen process model for FX option pricing.
 
@@ -109,7 +109,7 @@ class GarmanKohlagenProcessModel():
 
 
 class BlackScholesMertonModel():
-    def __init__(self, yield_curve, dividend_curve, vol_curve, initialValue):
+    def __init__(self, yield_curve:ql.YieldTermStructureHandle, dividend_curve:ql.YieldTermStructureHandle, vol_curve:ql.BlackVarianceSurface, initialValue:Literal[float, ql.QuoteHandle]):
         """
         Initialize a Black-Scholes-Merton process model for equity option pricing.
 
@@ -182,7 +182,7 @@ class BlackScholesMertonModel():
         return spot_paths_df
         
 class HullWhiteModel():
-    def __init__(self, settlementDate, curve):
+    def __init__(self, settlementDate, curve:ql.YieldTermStructureHandle):
         """
         Initialize a Hull-White model for interest rate simulation.
 
@@ -237,8 +237,7 @@ class HullWhiteModel():
             self.calibration_error = None
 
 
-
-    def monte_carlo_paths(self,  index_factories, fixingSchedule, paymentSchedule, numPaths):
+    def monte_carlo_paths(self,  index_factories:Dict[str, IndexFactory], fixingSchedule: Schedule, paymentSchedule: Schedule, numPaths:int):
         """
         Generate Monte Carlo simulation paths for interest rates using the Hull-White model.
         
@@ -248,12 +247,12 @@ class HullWhiteModel():
         
         Parameters
         ----------
-        index_factories : list of callable
+        index_factories : dict[str, callable]
             List of factory functions that create interest rate indices which take only ql.YieldTermStructureHandle as input. 
             These are the indexes that you want the fixing value at each fixing date.
-        fixingSchedule : ql.Schedule
+        fixingSchedule : Schedule
             Schedule of dates for which to generate index fixings
-        paymentSchedule : ql.Schedule
+        paymentSchedule : Schedule
             Schedule of dates for which to calculate discount factors
         numPaths : int
             Number of Monte Carlo paths to simulate
@@ -296,7 +295,7 @@ class HullWhiteModel():
 
         underlying_path = []
         forward_curves=[]
-        fixings_list = [[] for _ in index_factories]
+        fixings_list = {k:[] for k,_ in index_factories.items()}
         discountFactors = []
         for i in range(numPaths):
             samplePath = pathGenerator.next()
@@ -307,14 +306,14 @@ class HullWhiteModel():
             fwd_crv = ql.YieldTermStructureHandle(ql.ForwardCurve([d for d in all_dates], underlying, dayCount))
             # print(f'fwd_crv start date: {fwd_crv.dates()[0]}, end date: {fwd_crv.dates()[-1]}')
             ts = fwd_crv
-            for index_factory, fixings in zip(index_factories, fixings_list):
+            for k, index_factory in index_factories.items():
                 index=index_factory(ts)
-                fixings.append([index.fixing(d) for d in fixingSchedule])
+                fixings_list[k].append([index.fixing(d) for d in fixingSchedule])
             discountFactors.append([fwd_crv.discount(d) for d in paymentSchedule])
             forward_curves.append(fwd_crv)
             
         underlying_path = np.array(underlying_path).transpose()
-        fixings_list = [np.array(fixings).transpose() for fixings in fixings_list]
+        fixings_list = {k:np.array(fixings).transpose() for k, fixings in fixings_list.items()}
         discountFactors = np.array(discountFactors).transpose()
 
         # Helper to convert QuantLib Dates to Python date
@@ -322,13 +321,10 @@ class HullWhiteModel():
             return qld.to_date() if hasattr(qld, 'to_date') else ql.Date(qld).to_date()
 
         # Do not convert schedules to Python dates here
-        # all_dates_idx = [ql_to_date(d) for d in all_dates]
-        # fixingSchedule_idx = [ql_to_date(d) for d in fixingSchedule]
-        # paymentSchedule_idx = [ql_to_date(d) for d in paymentSchedule]
 
         # Convert to DataFrames with appropriate indices
         underlying_path_df = pd.DataFrame(underlying_path, index=[d for d in all_dates])
-        fixings_dfs = [pd.DataFrame(fixings, index=[d for d in fixingSchedule]) for fixings in fixings_list]
+        fixings_dfs = {k:pd.DataFrame(fixings, index=[d for d in fixingSchedule]) for k, fixings in fixings_list.items()}
         discountFactors_df = pd.DataFrame(discountFactors, index=[d for d in paymentSchedule])
 
         return underlying_path_df, fixings_dfs, discountFactors_df
@@ -392,13 +388,15 @@ class HestonModel():
         except:
             self.calibration_detail = None
 
-    def monte_carlo_paths(self, fixingSchedule:ql.Schedule, numPaths:int):
+    def monte_carlo_paths(self, fixingSchedule: Schedule, numPaths:int):
         """
         generate paths based on fixing schedule
-        fixingSchedule: fixing schedule
-        numPaths: number of paths
+        Args:
+            fixingSchedule (Schedule): fixing schedule
+            numPaths (int): number of paths
 
-        return: DataFrame with index as fixing dates, columns as paths
+        Returns:
+            DataFrame with index as fixing dates, columns as paths
         """
         # Generate all daily dates between fixingSchedule[0] and fixingSchedule[-1]
         all_dates = ql.Schedule(fixingSchedule[0], fixingSchedule[-1], ql.Period('1d'), self.calendar, ql.Following, ql.Following, ql.DateGeneration.Backward, False)
@@ -452,13 +450,13 @@ class MultiAssetModel():
         self.processes = processes
         self.correlation_matrix = correlation_matrix
         
-    def monte_carlo_paths(self, fixingSchedule:ql.Schedule, numPaths:int, dayCount:ql.DayCounter=ql.Actual365Fixed()):
+    def monte_carlo_paths(self, fixingSchedule:Schedule, numPaths:int, dayCount:ql.DayCounter=ql.Actual365Fixed()):
         """
         Generate paths for multiple assets based on fixing schedule.
 
         Parameters
         ----------
-        fixingSchedule : ql.Schedule
+        fixingSchedule : Schedule
             Schedule of dates for which to generate simulated values
         numPaths : int
             Number of Monte Carlo paths to simulate

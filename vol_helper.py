@@ -2,8 +2,8 @@ import QuantLib as ql
 import pandas as pd
 from conventions import Conventions
 from typing import Literal
-
-def create_black_vol_curve(vol_curve: pd.Series, reference_date:ql.Date, dayCount:ql.DayCounter=ql.Business252()):
+from typing import List
+def create_black_vol_curve(vol_curve: pd.Series, reference_date:ql.Date, dayCount:ql.DayCounter=ql.Business252()) -> ql.BlackVolTermStructureHandle:
     """
     Create a QuantLib BlackVarianceCurve from a pandas Series containing volatility data.
     
@@ -24,7 +24,7 @@ def create_black_vol_curve(vol_curve: pd.Series, reference_date:ql.Date, dayCoun
     
     Returns
     -------
-    QuantLib.BlackVarianceCurve
+    QuantLib.BlackVolTermStructureHandle
         Configured BlackVarianceCurve with extrapolation enabled for pricing derivatives
 
     """
@@ -38,7 +38,7 @@ def create_black_vol_curve(vol_curve: pd.Series, reference_date:ql.Date, dayCoun
     volatilityCurve.enableExtrapolation()
     return ql.BlackVolTermStructureHandle(volatilityCurve)
 
-def create_black_vol_surface(df: pd.DataFrame, reference_date:ql.Date, dayCount:ql.DayCounter=ql.Actual365Fixed(), calendar=ql.WeekendsOnly()):
+def create_black_vol_surface(df: pd.DataFrame, reference_date:ql.Date, dayCount:ql.DayCounter=ql.Actual365Fixed(), calendar=ql.WeekendsOnly()) -> ql.BlackVolTermStructureHandle:
     """
     Create a QuantLib BlackVarianceSurface from a DataFrame containing volatility data.
     
@@ -62,7 +62,7 @@ def create_black_vol_surface(df: pd.DataFrame, reference_date:ql.Date, dayCount:
     
     Returns
     -------
-    QuantLib.BlackVarianceSurface
+    QuantLib.BlackVolTermStructureHandle
         Configured BlackVarianceSurface with extrapolation enabled for pricing derivatives
  
     """
@@ -77,7 +77,7 @@ def create_black_vol_surface(df: pd.DataFrame, reference_date:ql.Date, dayCount:
     volatilitySurface.enableExtrapolation()
     return ql.BlackVolTermStructureHandle(volatilitySurface)
 
-def create_heston_model_helper(df: pd.DataFrame, spot:float, yield_curve:ql.YieldTermStructure, dividend_curve:ql.YieldTermStructure, calendar=ql.NullCalendar(), engine=None):
+def create_heston_model_helper(df: pd.DataFrame, spot:float, yield_curve:ql.YieldTermStructure, dividend_curve:ql.YieldTermStructure, calendar=ql.NullCalendar(), engine=None) -> List[ql.HestonModelHelper]:
     """
     Create a list of QuantLib HestonModelHelper objects from a DataFrame containing option market data.
     
@@ -233,9 +233,9 @@ def _create_TWD_swaption_helpers(df: pd.DataFrame, curve, engine=None):
 
 def create_swaption_helper(
                         df: pd.DataFrame, 
-                        curve, 
+                        curve:ql.YieldTermStructureHandle, 
                         engine=None,
-                        currency: Literal['USD', 'EUR', 'JPY', 'GBP', 'CHF', 'TWD']='USD'):
+                        currency: Literal['USD', 'EUR', 'JPY', 'GBP', 'CHF', 'TWD']='USD') -> List[ql.SwaptionHelper]:
     """
     Create currency-specific swap rate helpers using predefined market conventions.
     
