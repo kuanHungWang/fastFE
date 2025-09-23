@@ -35,7 +35,6 @@ from type_hint import (
 
 
 
-# Step 1. Set up parameters, including contract parameters, market conventions such as day count, date rolling convention, etc.
 # contract parameters
 fixed_rate = 0.018
 notional = 1_000_000
@@ -49,30 +48,20 @@ non_call_period = 2
 # number of paths for monte carlo simulation
 n_path = 6
 
-# conventions
 calendar = ql.UnitedStates(ql.UnitedStates.Settlement)
-
-
 # set evaluation date
 valuationDate = ql.Date().todaysDate()
 valuationDate = calendar.advance(valuationDate,ql.Period(0, ql.Days))  # ensure today is a business day (In case of using in non-trading day)
+# set settlement date
 settlementDate = calendar.advance(valuationDate,ql.Period(2, ql.Days))
 ql.Settings.instance().evaluationDate = valuationDate
 print(f' trade date: {valuationDate}')
 
-
-# Step 2. Prepare market data, including data to bootstrap curve and data to calibrate model.
-# For this example, we use deposit and swap data to bootstrap curve, and swaption data to calibrate Hull White model.
-# Market data to bootstrap curve.
+# Implementing Nodes
 
 def CreateUSDCurve():
     df_deposit = get_deposit('USD', ['1M', '2M', '3M', '6M', '9M'])
     df_swap = get_swap('USD', ['1Y', '2Y', '5Y', '7Y', '10Y', '15Y', '20Y', '25Y', '30Y'])
-
-    # swaption data to calibrate Hull White model
-
-
-    # Step 3. Create curve and model, use previously created market data as input and calibration data.
     curve = bootstrap_curve(valuationDate, deposit=df_deposit, swap=df_swap)
     return {'curve': curve}
 
@@ -160,7 +149,7 @@ def CreateExercisePayoff():
     return {'exercise_payoff': lambda x: np.zeros(len(x))}   # The cashflow of calling(cancelling) the contract, in this case is 0.
 
 
-
+# Defining Nodes
 create_usd_curve: CurveCreator = CreateUSDCurve
 create_usd_swaption_data: DataFrameCreator = CreateUSDSwaptionData
 create_customized_schedule: ScheduleCreator = CustomizedScheduleCreator
@@ -170,7 +159,7 @@ cashflows_creator: CashflowsCreator = CreateCashFlows
 exercise_payoff_creator: ExercisePayoffCreator = CreateExercisePayoff
 
 
-
+# Link and execute nodes(Also where graph is built)
 df_swaption = create_usd_swaption_data()
 curve = create_usd_curve()
 hw_model = HullWhiteModel(valuationDate, curve['curve'])
