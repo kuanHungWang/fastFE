@@ -24,5 +24,8 @@ class PricingModelNode(Node):
         schedule_input = inputs.get('schedule_input')
         print(f"  - Received input: {schedule_input}")
         # In a real implementation, this would be a complex pricing model.
-        mock_price = 123.45
-        return {"price": mock_price}
+        if schedule_input:
+            result_string = f"Priced with schedule: {schedule_input}"
+        else:
+            result_string = "Pricing failed: No schedule received."
+        return {"price": result_string}

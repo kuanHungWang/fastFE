@@ -26,7 +26,9 @@ TEMPLATE_REGISTRY = {
             {
                 "id": "e1-2",
                 "source": "schedule-creator-abstract-1",
-                "target": "model-abstract-1"
+                "target": "model-abstract-1",
+                "sourceHandle": "output_schedule",
+                "targetHandle": "schedule_input"
             }
         ]
     }

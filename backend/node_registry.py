@@ -4,13 +4,17 @@ NODE_REGISTRY = {
             "display_name": "Schedule Creator",
             "implementations": [
                 "periodicScheduleNode",
-            ]
+            ],
+            "inputs": [],
+            "outputs": [{"name": "output_schedule", "type": "Schedule"}]
         },
         "Model": {
             "display_name": "Model",
             "implementations": [
                 "pricingModelNode"
-            ]
+            ],
+            "inputs": [{"name": "schedule_input", "type": "Schedule"}],
+            "outputs": [{"name": "price", "type": "string"}]
         }
     },
     "concrete": {
@@ -24,15 +28,15 @@ NODE_REGISTRY = {
                 "frequency": {"type": "string", "default": "6M"}
             },
             "inputs": [],
-            "outputs": [{"name": "output_schedule", "type": "ScheduleCreator"}]
+            "outputs": [{"name": "output_schedule", "type": "Schedule"}]
         },
         "pricingModelNode": {
             "display_name": "Pricing Model",
             "implements": "Model",
             "class_path": "backend.nodes.PricingModelNode",
             "parameters": {},
-            "inputs": [{"name": "schedule_input", "type": "ScheduleCreator"}],
-            "outputs": [{"name": "price", "type": "float"}]
+            "inputs": [{"name": "schedule_input", "type": "Schedule"}],
+            "outputs": [{"name": "price", "type": "string"}]
         }
     }
 }
