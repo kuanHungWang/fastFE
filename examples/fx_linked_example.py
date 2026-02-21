@@ -7,6 +7,7 @@ from fastFE.curve_builder import (
 )
 from fastFE.vol_helper import create_black_vol_surface
 from fastFE.models import GarmanKohlagenProcessModel
+# NOTE: market_data provides MOCK/SYNTHETIC data for testing only. Not real market data.
 from market_data import (
     get_deposit,
     get_swap,

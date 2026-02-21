@@ -12,6 +12,7 @@ from fastFE.models import (
     BlackScholesMertonModel,
     MultiAssetModel
 )
+# NOTE: market_data provides MOCK/SYNTHETIC data for testing only. Not real market data.
 from market_data import (
     get_deposit,
     get_swap,

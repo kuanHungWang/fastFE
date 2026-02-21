@@ -1,3 +1,8 @@
+# DISCLAIMER: This module provides MOCK/SYNTHETIC market data generated programmatically
+# for testing and demonstration purposes only. All rates, prices, and volatilities are
+# fictional and do NOT represent real market data. Do NOT use for actual trading or
+# financial decision-making.
+
 import pandas as pd
 import numpy as np
 from typing import List

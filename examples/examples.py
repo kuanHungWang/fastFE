@@ -8,6 +8,7 @@ from fastFE.curve_builder import bootstrap_curve, bootstrap_curve_with_instrumen
 from fastFE.vol_helper import *
 from fastFE.leastSquareError import LongstaffSchwartz
 from fastFE.models import HullWhiteModel, HestonModel, MultiAssetModel, BlackScholesMertonModel, GarmanKohlagenProcessModel
+# NOTE: market_data provides MOCK/SYNTHETIC data for testing only. Not real market data.
 from market_data import *
 currency = ql.EURCurrency()
 libor_dayCount = ql.Actual360()

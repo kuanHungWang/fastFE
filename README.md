@@ -249,6 +249,8 @@ swap_helpers    = create_swap_rate_helpers(
 
 ## Examples
 
+> **Disclaimer:** All example files import from the `market_data` module, which provides **mock/synthetic data generated programmatically for testing and demonstration purposes only**. All rates, prices, and volatilities are fictional and do **not** represent real market data. Do not use for actual trading or financial decision-making.
+
 | File | Description |
 |------|-------------|
 | [`examples/examples.py`](examples/examples.py) | Comprehensive reference — dates, schedules, all rate helpers, all model types, LSM |

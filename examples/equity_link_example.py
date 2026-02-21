@@ -7,6 +7,7 @@ from fastFE.util import (
 )
 from fastFE.curve_builder import bootstrap_curve
 from fastFE.models import HestonModel
+# NOTE: market_data provides MOCK/SYNTHETIC data for testing only. Not real market data.
 from market_data import (
     get_deposit,
     get_swap,
