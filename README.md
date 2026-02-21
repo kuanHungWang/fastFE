@@ -1,4 +1,4 @@
-# fastquant
+# fastFE
 
 A Python library that simplifies [QuantLib](https://www.quantlib.org/) for pricing exotic derivatives. It provides high-level abstractions for yield curve bootstrapping, volatility surface construction, financial model calibration, and Monte Carlo simulation — so you can focus on the economics of a trade rather than QuantLib's low-level API.
 
@@ -15,7 +15,7 @@ A Python library that simplifies [QuantLib](https://www.quantlib.org/) for prici
 ## Installation
 
 ```bash
-pip install fastquant
+pip install fastFE
 ```
 
 QuantLib must be installed separately (see [QuantLib-Python installation guide](https://github.com/lballabio/QuantLib)):
@@ -31,7 +31,7 @@ pip install QuantLib
 ```python
 import QuantLib as ql
 import pandas as pd
-from fastquant import bootstrap_curve
+from fastFE import bootstrap_curve
 
 today = ql.Date().todaysDate()
 
@@ -59,7 +59,7 @@ See [`examples/examples.py`](examples/examples.py) for a complete reference of a
 ```python
 import QuantLib as ql
 import pandas as pd
-from fastquant import create_black_vol_curve, create_black_vol_surface
+from fastFE import create_black_vol_curve, create_black_vol_surface
 
 today = ql.Date().todaysDate()
 
@@ -87,7 +87,7 @@ vol_surface = create_black_vol_surface(vol_df, today)
 
 ```python
 import QuantLib as ql
-from fastquant import BlackScholesMertonModel, create_black_vol_curve
+from fastFE import BlackScholesMertonModel, create_black_vol_curve
 
 today = ql.Date().todaysDate()
 dayCount = ql.Actual365Fixed()
@@ -119,7 +119,7 @@ See [`examples/equity_link_example.py`](examples/equity_link_example.py) for a c
 
 ```python
 import QuantLib as ql
-from fastquant import GarmanKohlagenProcessModel, create_black_vol_surface
+from fastFE import GarmanKohlagenProcessModel, create_black_vol_surface
 
 today = ql.Date().todaysDate()
 dayCount = ql.Actual365Fixed()
@@ -146,7 +146,7 @@ See [`examples/fx_linked_example.py`](examples/fx_linked_example.py) for an FX r
 ```python
 import QuantLib as ql
 import pandas as pd
-from fastquant import HullWhiteModel, bootstrap_curve
+from fastFE import HullWhiteModel, bootstrap_curve
 
 today = ql.Date().todaysDate()
 ql.Settings.instance().evaluationDate = today
@@ -181,7 +181,7 @@ See [`examples/irs_examle.py`](examples/irs_examle.py) for a cancellable Libor I
 ```python
 import numpy as np
 import pandas as pd
-from fastquant import LongstaffSchwartz, subset_to_bool
+from fastFE import LongstaffSchwartz, subset_to_bool
 
 # cashflows: pd.DataFrame (payment_dates x paths)
 # discount_factors: pd.DataFrame (payment_dates x 1)
@@ -211,7 +211,7 @@ See [`examples/examples.py`](examples/examples.py) for a standalone LSM example 
 ### Multi-asset Monte Carlo
 
 ```python
-from fastquant import MultiAssetModel
+from fastFE import MultiAssetModel
 
 corr_matrix = [[1.0, 0.6], [0.6, 1.0]]
 
@@ -235,7 +235,7 @@ See [`examples/multi_stock_examle.py`](examples/multi_stock_examle.py) for a mul
 `Conventions` provides pre-built fixed and floating leg convention dictionaries for USD, EUR, JPY, TWD, CHF, and GBP, ready to pass directly into rate helper constructors.
 
 ```python
-from fastquant import Conventions, create_deposit_rate_helpers, create_swap_rate_helpers
+from fastFE import Conventions, create_deposit_rate_helpers, create_swap_rate_helpers
 
 deposit_helpers = create_deposit_rate_helpers(df_deposit, Conventions.USFixedLegConventions())
 swap_helpers    = create_swap_rate_helpers(

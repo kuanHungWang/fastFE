@@ -1,5 +1,5 @@
 """
-fastquant - A Python library that simplifies QuantLib for pricing exotic derivatives.
+fastFE - A Python library that simplifies QuantLib for pricing exotic derivatives.
 
 Modules
 -------
@@ -22,8 +22,8 @@ market_data
     Mock market data helpers for development and testing.
 """
 
-from fastquant.curve_builder import bootstrap_curve, bootstrap_curve_with_instrument_helpers
-from fastquant.rate_helpers import (
+from fastFE.curve_builder import bootstrap_curve, bootstrap_curve_with_instrument_helpers
+from fastFE.rate_helpers import (
     create_deposit_rate_helpers,
     create_swap_rate_helpers,
     create_fra_rate_helpers,
@@ -31,22 +31,22 @@ from fastquant.rate_helpers import (
     create_bond_helper,
     create_sofr_future_rate_helpers,
 )
-from fastquant.vol_helper import (
+from fastFE.vol_helper import (
     create_black_vol_curve,
     create_black_vol_surface,
     create_swaption_helper,
     create_heston_model_helper,
 )
-from fastquant.models import (
+from fastFE.models import (
     HullWhiteModel,
     HestonModel,
     BlackScholesMertonModel,
     GarmanKohlagenProcessModel,
     MultiAssetModel,
 )
-from fastquant.conventions import Conventions
-from fastquant.leastSquareError import LongstaffSchwartz
-from fastquant.util import (
+from fastFE.conventions import Conventions
+from fastFE.leastSquareError import LongstaffSchwartz
+from fastFE.util import (
     year_fraction,
     combine_schedule,
     subset_to_bool,

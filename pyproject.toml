@@ -3,7 +3,7 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "fastquant"
+name = "fastFE"
 version = "0.1.0"
 description = "A Python library that simplifies QuantLib for pricing exotic derivatives — curves, vol surfaces, and Monte Carlo out of the box."
 readme = "README.md"
@@ -54,9 +54,9 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/kuanhungwang/fastquant"
-Issues = "https://github.com/kuanhungwang/fastquant/issues"
+Homepage = "https://github.com/kuanhungwang/fastFE"
+Issues = "https://github.com/kuanhungwang/fastFE/issues"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["fastquant*"]
+include = ["fastFE*"]
