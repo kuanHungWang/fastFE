@@ -1,13 +1,13 @@
 import pandas as pd
 import numpy as np
 import QuantLib as ql
-from util import *
-from conventions import Conventions
-from rate_helpers import *
-from curve_builder import bootstrap_curve, bootstrap_curve_with_instrument_helpers
-from vol_helper import *
-from leastSquareError import LongstaffSchwartz
-from models import HullWhiteModel, HestonModel, MultiAssetModel, BlackScholesMertonModel, GarmanKohlagenProcessModel
+from fastFE.util import *
+from fastFE.conventions import Conventions
+from fastFE.rate_helpers import *
+from fastFE.curve_builder import bootstrap_curve, bootstrap_curve_with_instrument_helpers
+from fastFE.vol_helper import *
+from fastFE.leastSquareError import LongstaffSchwartz
+from fastFE.models import HullWhiteModel, HestonModel, MultiAssetModel, BlackScholesMertonModel, GarmanKohlagenProcessModel
 from market_data import *
 currency = ql.EURCurrency()
 libor_dayCount = ql.Actual360()
@@ -137,7 +137,7 @@ bond_helpers = create_bond_helper(df_bond, conventions=conventions)
 keywords: USD curve, EUR curve, JPY curve, GBP curve, TWD curve, quick curve builder, recommended curve builder
 """
 #@code
-from curve_builder import bootstrap_curve
+from fastFE.curve_builder import bootstrap_curve
 today = ql.Date().todaysDate()
 df_deposit = pd.DataFrame({'tenor': ['1M', '2M', '3M', '6M', '9M'], 'rates': [0.015, 0.018, 0.02, 0.022, 0.025]})
 df_swap = pd.DataFrame({'rate': [0.015, 0.018, 0.02, 0.022, 0.025],'tenor': ['1Y', '2Y', '5Y', '7Y', '10Y']})
@@ -149,8 +149,8 @@ curve = bootstrap_curve(today, deposit=df_deposit, swap=df_swap)
 """swaption helper builder, use to calibrate interest rate model.
 keywords: swaption helper, volatility, interest rate model, calibration"""
 #@code
-from curve_builder import bootstrap_curve
-from vol_helper import create_swaption_helper
+from fastFE.curve_builder import bootstrap_curve
+from fastFE.vol_helper import create_swaption_helper
 today = ql.Date().todaysDate()
 df_deposit = pd.DataFrame({
 'tenor': ['1M', '2M', '3M', '6M', '9M'],
@@ -175,7 +175,7 @@ swaption_helpers = create_swaption_helper(df_swaption, curve, currency='USD')
 """heston model helper, use to calibrate heston model.
 keywords: heston model, volatility, calibration, volatility helper"""
 # @code
-from vol_helper import create_heston_model_helper
+from fastFE.vol_helper import create_heston_model_helper
 heston_vol_df = pd.DataFrame({
     'expiration': ['1M', '2M', '3M', '6M', '9M'],
     'strike': [0.015, 0.018, 0.02, 0.022, 0.025],
@@ -194,8 +194,8 @@ keywords: Black-Scholes-Merton Model, BSM Model, equity option, constant volatil
 #@code
 import QuantLib as ql
 import pandas as pd
-from vol_helper import create_black_vol_curve
-from models import BlackScholesMertonModel
+from fastFE.vol_helper import create_black_vol_curve
+from fastFE.models import BlackScholesMertonModel
 today = ql.Date().todaysDate()
 dayCount = ql.Actual365Fixed()
 calendar = ql.WeekendsOnly()
@@ -223,7 +223,7 @@ black_model_vol_surface = BlackScholesMertonModel(riskFreeCurve, dividendCurve, 
 keywords: Heston Model, stochastic volatility, equity option, calibration, monte carlo, paths generation"""
 import pandas as pd
 import QuantLib as ql
-from models import HestonModel
+from fastFE.models import HestonModel
 today = ql.Date().todaysDate()
 dayCount = ql.Actual365Fixed()
 calendar = ql.WeekendsOnly()
@@ -244,7 +244,7 @@ heston_model.calibrate(heston_vol_df, spot)
 keywords: Garman-Kohlagen Model, FX Model, constant volatility, volatility curve, volatility surface, local volatility, deterministic volatility, monte carlo, paths generation"""
 #@code
 import QuantLib as ql
-from models import GarmanKohlagenProcessModel
+from fastFE.models import GarmanKohlagenProcessModel
 today = ql.Date().todaysDate()
 dayCount = ql.Actual365Fixed()
 calendar = ql.WeekendsOnly()
@@ -298,7 +298,7 @@ fixings = fxModel.monte_carlo_paths(fixingSchedule, n_path)
 keyword: multi asset, multi process, hybrid model, hybrid process, monte carlo, paths generation"""
 #@code
 import QuantLib as ql
-from models import MultiAssetModel
+from fastFE.models import MultiAssetModel
 today = ql.Date().todaysDate()
 dayCount = ql.Actual365Fixed()
 calendar = ql.WeekendsOnly()
@@ -333,7 +333,7 @@ fx_fixings = fixings[1]
 """LongstaffSchwartz, Bermudan Option, American Option, early exercise, least square error method
 keywords: LongstaffSchwartz, Bermudan Option, American Option, early exercise, least square error method"""
 #@code
-from leastSquareError import LongstaffSchwartz
+from fastFE.leastSquareError import LongstaffSchwartz
 today = ql.Date().todaysDate()
 settlmentDate = today + ql.Period('2D')
 paymentSchedule = ql.MakeSchedule(settlmentDate, settlmentDate + ql.Period('1Y'), ql.Period('3M'))

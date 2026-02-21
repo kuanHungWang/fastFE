@@ -1,14 +1,14 @@
 import QuantLib as ql
 import numpy as np
 import pandas as pd
-from util import (
+from fastFE.util import (
     get_nearest_fixing_date,
     year_fraction,
     combine_schedule
 )
-from curve_builder import bootstrap_curve
-from vol_helper import create_black_vol_surface
-from models import (
+from fastFE.curve_builder import bootstrap_curve
+from fastFE.vol_helper import create_black_vol_surface
+from fastFE.models import (
     BlackScholesMertonModel,
     MultiAssetModel
 )

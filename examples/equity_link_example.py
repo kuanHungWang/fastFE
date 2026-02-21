@@ -1,12 +1,12 @@
 import QuantLib as ql
 import numpy as np
 import pandas as pd
-from util import (
+from fastFE.util import (
     get_nearest_fixing_date,
     year_fraction
 )
-from curve_builder import bootstrap_curve
-from models import HestonModel
+from fastFE.curve_builder import bootstrap_curve
+from fastFE.models import HestonModel
 from market_data import (
     get_deposit,
     get_swap,

@@ -1,15 +1,15 @@
 import QuantLib as ql
 import numpy as np
 import pandas as pd
-from util import (
+from fastFE.util import (
     subset_to_bool,
     get_nearest_fixing_date,
     year_fraction,
     combine_schedule
 )
-from curve_builder import  bootstrap_curve
-from leastSquareError import LongstaffSchwartz
-from models import HullWhiteModel
+from fastFE.curve_builder import  bootstrap_curve
+from fastFE.leastSquareError import LongstaffSchwartz
+from fastFE.models import HullWhiteModel
 from market_data import (
     get_deposit,
     get_swap,

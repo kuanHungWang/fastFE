@@ -1,12 +1,12 @@
 import QuantLib as ql
 import numpy as np
 import pandas as pd
-from util import get_nearest_fixing_date
-from curve_builder import (
+from fastFE.util import get_nearest_fixing_date
+from fastFE.curve_builder import (
     bootstrap_curve
 )
-from vol_helper import create_black_vol_surface
-from models import GarmanKohlagenProcessModel
+from fastFE.vol_helper import create_black_vol_surface
+from fastFE.models import GarmanKohlagenProcessModel
 from market_data import (
     get_deposit,
     get_swap,
