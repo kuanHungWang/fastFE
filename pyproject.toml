@@ -1,0 +1,62 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "easyql"
+version = "0.1.0"
+description = "A Python library that simplifies QuantLib for pricing exotic derivatives — curves, vol surfaces, and Monte Carlo out of the box."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.9"
+authors = [
+    { name = "Kuan-Hung Wang" }
+]
+keywords = [
+    "quantlib",
+    "quantitative finance",
+    "derivatives",
+    "interest rate",
+    "monte carlo",
+    "yield curve",
+    "volatility surface",
+    "exotic derivatives",
+    "fixed income",
+    "hull white",
+    "heston",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Financial and Insurance Industry",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Office/Business :: Financial",
+    "Topic :: Scientific/Engineering :: Mathematics",
+]
+dependencies = [
+    "QuantLib>=1.32",
+    "pandas>=1.5",
+    "numpy>=1.23",
+    "scikit-learn>=1.2",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov",
+    "black",
+    "ruff",
+]
+
+[project.urls]
+Homepage = "https://github.com/kuanhungwang/easyql"
+Issues = "https://github.com/kuanhungwang/easyql/issues"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["easyql*"]
