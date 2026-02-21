@@ -259,7 +259,6 @@ def bootstrap_curve(settlementDate, deposit: pd.DataFrame=None, swap: pd.DataFra
     Bootstrap a yield curve using various market instruments.
     
     Args:
-        currency (Literal['USD', 'EUR', 'JPY', 'GBP', 'TWD']): The currency for the curve
         settlementDate: The settlement date for the curve
         deposit (pd.DataFrame, optional): DataFrame containing deposit rates with 'tenor' and 'rates' columns
         swap (pd.DataFrame, optional): DataFrame containing swap rates with 'tenor' and 'rates' columns
@@ -272,7 +271,8 @@ def bootstrap_curve(settlementDate, deposit: pd.DataFrame=None, swap: pd.DataFra
             - 'cubicZero': Cubic zero rate interpolation
             - 'linearForward': Linear forward rate interpolation
             - 'splineCubicDiscount': Spline cubic discount factor interpolation
-    
+        currency (Literal['USD', 'EUR', 'JPY', 'GBP', 'TWD']): The currency for the curve
+
     Returns:
         QuantLib yield curve object with specified currency conventions
     """

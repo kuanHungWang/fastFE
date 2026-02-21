@@ -141,7 +141,7 @@ from curve_builder import bootstrap_curve
 today = ql.Date().todaysDate()
 df_deposit = pd.DataFrame({'tenor': ['1M', '2M', '3M', '6M', '9M'], 'rates': [0.015, 0.018, 0.02, 0.022, 0.025]})
 df_swap = pd.DataFrame({'rate': [0.015, 0.018, 0.02, 0.022, 0.025],'tenor': ['1Y', '2Y', '5Y', '7Y', '10Y']})
-curve = bootstrap_curve('USD', today, deposit=df_deposit, swap=df_swap)
+curve = bootstrap_curve(today, deposit=df_deposit, swap=df_swap)
 
 
 
@@ -161,13 +161,13 @@ df_swap = pd.DataFrame({
     'tenor': ['1Y', '2Y', '5Y', '7Y', '10Y']
 })
 
-curve = bootstrap_curve('USD', today, deposit=df_deposit, swap=df_swap)
+curve = bootstrap_curve(today, deposit=df_deposit, swap=df_swap)
 df_swaption = pd.DataFrame({
     'maturity': ['2Y', '3Y'],
     'length': ['5Y', '5Y'],
     'volatility': [0.0055, 0.0055]
 })
-swaption_helpers = create_swaption_helper('USD', df_swaption, curve, engine)
+swaption_helpers = create_swaption_helper(df_swaption, curve, currency='USD')
 
 
 
@@ -181,10 +181,11 @@ heston_vol_df = pd.DataFrame({
     'strike': [0.015, 0.018, 0.02, 0.022, 0.025],
     'vol': [0.015, 0.018, 0.02, 0.022, 0.025]
 }) 
+
 spot = 20
 dayCount = ql.Actual365Fixed()
-riskFreeCurve = ql.FlatForward(today, 0.04, dayCount)  # in real world we usually don't use flat forward curve, here just for example.
-dividendCurve = ql.FlatForward(today, 0.01, dayCount)
+riskFreeCurve = ql.YieldTermStructureHandle(ql.FlatForward(today, 0.04, dayCount))  # in real world we usually don't use flat forward curve, here just for example.
+dividendCurve = ql.YieldTermStructureHandle(ql.FlatForward(today, 0.01, dayCount))
 heston_helpers = create_heston_model_helper(heston_vol_df, spot, riskFreeCurve, dividendCurve)
 
 #@Description
@@ -199,12 +200,13 @@ today = ql.Date().todaysDate()
 dayCount = ql.Actual365Fixed()
 calendar = ql.WeekendsOnly()
 spot = 100
-riskFreeCurve = ql.FlatForward(today, 0.04, dayCount)  # Usually don't use flat curve in real world, just simplify for example.
-dividendCurve = ql.FlatForward(today, 0.01, dayCount)  # Usually don't use flat curve in real world, just simplify for example.
+riskFreeCurve = ql.YieldTermStructureHandle(ql.FlatForward(today, 0.04, dayCount))  # Usually don't use flat curve in real world, just simplify for example.
+dividendCurve = ql.YieldTermStructureHandle(ql.FlatForward(today, 0.01, dayCount))  # Usually don't use flat curve in real world, just simplify for example.
 black_vol_df = pd.Series([0.015, 0.018, 0.02, 0.022, 0.025], index=['1M', '2M', '3M', '6M', '9M'])
 # There are 3 types of volatility that BlackScholesMertonModel can use:
 # 1. constant volatility
 const_vol = ql.BlackConstantVol(today, calendar, 0.02, dayCount)
+const_vol = ql.BlackVolTermStructureHandle(const_vol)
 black_model_const_vol = BlackScholesMertonModel(riskFreeCurve, dividendCurve, const_vol, spot)
 # 2. volatility curve
 vol_curve = create_black_vol_curve(black_vol_df, today)
@@ -231,8 +233,8 @@ heston_vol_df = pd.DataFrame({
     'vol': [0.015, 0.018, 0.02, 0.022, 0.025]
 })
 spot = 100
-riskFreeCurve = ql.FlatForward(today, 0.04, dayCount)  # Usually don't use flat curve in real world, just simplify for example.
-dividendCurve = ql.FlatForward(today, 0.01, dayCount)  # Usually don't use flat curve in real world, just simplify for example.
+riskFreeCurve = ql.YieldTermStructureHandle(ql.FlatForward(today, 0.04, dayCount))  # Usually don't use flat curve in real world, just simplify for example.
+dividendCurve = ql.YieldTermStructureHandle(ql.FlatForward(today, 0.01, dayCount))  # Usually don't use flat curve in real world, just simplify for example.
 heston_model = HestonModel(riskFreeCurve, dividendCurve, calendar)
 heston_model.calibrate(heston_vol_df, spot)
 
@@ -247,12 +249,12 @@ today = ql.Date().todaysDate()
 dayCount = ql.Actual365Fixed()
 calendar = ql.WeekendsOnly()
 spot = 1.3
-domestic_curve = ql.FlatForward(today, 0.04, dayCount) # Usually don't use flat curve in real world, just simplify for example.
-foreign_curve = ql.FlatForward(today, 0.05, dayCount) # Usually don't use flat curve in real world, just simplify for example.
+domestic_curve = ql.YieldTermStructureHandle(ql.FlatForward(today, 0.04, dayCount)) # Usually don't use flat curve in real world, just simplify for example.
+foreign_curve = ql.YieldTermStructureHandle(ql.FlatForward(today, 0.05, dayCount)) # Usually don't use flat curve in real world, just simplify for example.
 
 # There are 3 types of volatility that GarmanKohlagenProcessModel can use:
 # 1. constant volatility
-const_vol = ql.BlackConstantVol(today, calendar, 0.2, dayCount) # Usually don't use flat curve in real world, just simplify for example.
+const_vol = ql.BlackVolTermStructureHandle(ql.BlackConstantVol(today, calendar, 0.2, dayCount)) # Usually don't use flat curve in real world, just simplify for example.
 fxModel = GarmanKohlagenProcessModel(foreign_curve, domestic_curve, const_vol, spot)
 
 # 2. volatility curve
@@ -279,6 +281,7 @@ paths = black_model_vol_surface.monte_carlo_paths(fixingSchedule, n_path)
 
 # or
 heston_model = HestonModel(riskFreeCurve, dividendCurve, calendar)
+heston_model.calibrate(heston_vol_df, spot)
 paths = heston_model.monte_carlo_paths(fixingSchedule, n_path)
 # or
 fxModel = GarmanKohlagenProcessModel(foreign_curve, domestic_curve, vol_surface, spot)
@@ -321,17 +324,7 @@ fx_fixings = fixings[1]
 # type(fx_fixings): pandas.DataFrame, shape: (len(fixingSchedule), n_path)
 
 
-#@Description
-"""market data
- market data, deposit market data, swap market data, swaption market data, volatility market data, local volatility market data, volatility surface market data"""
-#@code
-from market_data import get_volatility_surface, get_deposit, get_swap, get_swaption, get_price, get_dividend_rate
-df_vol_surface = get_volatility_surface('AAPL', ['1M', '2M', '3M', '6M', '9M'], [100, 110, 120, 130, 140])
-df_deposit = get_deposit(['1M', '2M', '3M', '6M', '9M'])
-df_swap = get_swap(['1Y', '2Y', '5Y', '7Y', '10Y', '15Y', '20Y', '25Y', '30Y'])
-df_swaption = get_swaption(['2Y', '3Y', '5Y', '7Y', '10Y', '15Y', '20Y', '25Y'], ['5Y', '5Y', '5Y', '5Y', '5Y', '5Y', '5Y', '5Y'])
-df_price = get_price('AAPL')
-df_dividend_rate = get_dividend_rate('AAPL')
+
 
 
 
@@ -366,92 +359,5 @@ ls.exercise_cashflows() # return expected cashflows of early exercise of each pe
 ls.exercise_mask()  # return whether to exercise at each period and each path.
 
 
-#@Description
-"""Create interest rate index
-keywords: interest rate index, libor, ibor, euribor, overnight, SOFR, """
-#@code
-yieldCurve = ql.FlatForward(today, 0.04, ql.Actual365Fixed())
-endOfMonth = False
-settlementDays = 2
-dayCounter = ql.Actual360()
-currency = ql.USDCurrency()
-ibor_index = ql.IborIndex('MyIborIndex', ql.Period('6m'), settlementDays, currency, calendar, ql.Following, endOfMonth, dayCounter, yieldCurve)
-euribor_index = ql.Euribor(ql.Period('6M'), yieldCurve)
-overnight_index = ql.OvernightIndex('MyOvernightIndex', settlementDays, currency, calendar, dayCounter, yieldCurve)
-cms10Y =ql.UsdLiborSwapIsdaFixAm(ql.Period('10Y'), yieldCurve)
 
-
-#@Description
-"""Get fixing values of a index
-keywords: fixing, index fixing, index value"""
-#@code
-yieldCurve = ql.FlatForward(today, 0.04, ql.Actual365Fixed()) # In real world we usually don't use flat forward curve, here just for example.
-ibor_index = ql.IborIndex('MyIborIndex', ql.Period('6m'), settlementDays, currency, calendar, ql.Following, endOfMonth, dayCounter, yieldCurve)
-date = calendar.advance(today,ql.Period(2, ql.Days))
-libor_fixings = ibor_index.fixing(date)
-
-#@Description
-"""get discount factor from a yield curve
-keywords: discount factor, yield curve, discount"""
-#@code
-yieldCurve = ql.FlatForward(today, 0.04, ql.Actual365Fixed())  # In real world we usually don't use flat forward curve, here just for example.
-date = calendar.advance(today,ql.Period("1Y"))
-discount_factor = yieldCurve.discount(date)
-
-
-#@Description
-"""calculate floating cashflow with libor index in deterministic interest rate environment (Usually used in non-IR linked, short-term product where FX, Equity or other asset class is more focused).
-keywords: deterministic floating cashflow, libor index, deterministic interest rate environment"""
-#@code
-yieldCurve = ql.FlatForward(today, 0.04, ql.Actual365Fixed())  # In real world we usually don't use flat forward curve, here just for example.
-libor_index = ql.IborIndex('MyIborIndex', ql.Period('6m'), settlementDays, currency, calendar, ql.Following, endOfMonth, dayCounter, yieldCurve)
-libor_fixings = [libor_index.fixing(d) for d in fixingSchedule]  # get fixing values for each fixing date from index using .fixing() method
-libor_fixings = pd.DataFrame(libor_fixings, paymentSchedule)  # convert to pandas DataFrame for easy manipulation, notes that we use paymentSchedule as index, not fixingSchedule, in order to align with other cashflow, discount factor, etc.
-if fixing_in_advance:
-    libor_fixings = libor_fixings.shift(1)  # as we shift, first item will become NaN, but this is fine since we don't have payment in the first date.
-libor_year_fraction = np.array(year_fraction(paymentSchedule, libor_dayCount, accoumulative=False))[:, np.newaxis]  # reshape to (n, 1) for broadcast.
-libor_cashflows = notional * libor_fixings * libor_year_fraction
-# Note that the year fractions generated by year_fraction() includes a zero at first item, this is in-line with the fact that schedule generated by ql.MakeSchedule() includes the first date.
-# For example, if we generate a paymentSchedule with startDate=2025-09-07, endDate=2026-09-07, frequency=6M, then the paymentSchedule will be [2025-09-07, 2026-03-07, 2026-09-07], and the year_fraction will be [0, 0.5, 0.5].
-
-#@Description
-"""calculate floating cashflow with libor index in stochastic interest rate with multiple simulation paths of fixing.
-keywords: floating cashflow, libor index, stochastic interest rate, monte carlo simulation of floating leg"""
-
-#@code
-corresponding_fixing_schedule = [get_nearest_fixing_date(d, libor_fixings.index) for d in paySchedule] 
-libor_fixing_value = libor_fixings.loc[corresponding_fixing_schedule]  
-if fixing_in_advance:  # process fixing-in-advance case if True 
-    libor_fixing_value = libor_fixing_value.shift(1)  # Note: the first row of all fixing_value is NaN, but this is fine since we don't have payment in the first date.
-# Apply the fixing values to calculate libor cashflows
-year_fraction_pay = np.array(year_fraction(paySchedule, dayCount, accoumulative=False))[:,np.newaxis] # use np.newaxis to reshape to (n, 1) to broadcast to dataFrame
-libor_cashflows = notional * libor_fixing_value.values * year_fraction_pay  # calculate floating cashflows
-libor_cashflows = pd.DataFrame(libor_cashflows, index=paySchedule)  
-# Note that the year fractions generated by year_fraction() includes a zero at first item, this is in-line with the fact that schedule generated by ql.MakeSchedule() includes the first date.
-# For example, if we generate a paymentSchedule with startDate=2025-09-07, endDate=2026-09-07, frequency=6M, then the paymentSchedule will be [2025-09-07, 2026-03-07, 2026-09-07], and the year_fraction will be [0, 0.5, 0.5].
-
-
-
-#@Description
-"""calculate sofr compounded cashflows
-"""
-
-#@code
-floating_cashflows = []
-for i in range(1, len(paySchedule)):
-    period_start = paySchedule[i-1]
-    period_end = paySchedule[i]
-    # Get all daily dates in the accrual period
-    daily_dates = [d for d in fixings.index if period_start < d <= period_end]
-    # Get daily SOFR rates for all paths
-    daily_rates = fixings.loc[daily_dates].values  # shape: (num_days, num_paths)
-    # Get year fractions for each day (using Actual/360 convention)
-    delta_t = np.array([dayCount.yearFraction(daily_dates[j-1], daily_dates[j]) if j > 0 else dayCount.yearFraction(period_start, daily_dates[j]) for j in range(len(daily_dates))])
-    # For each path, compute compounded rate
-    compounded = np.prod(1 + daily_rates * delta_t[:, np.newaxis], axis=0) - 1
-    # Compute cashflow for each path
-    cf = notional * compounded
-    floating_cashflows.append(cf)
-floating_cashflows = np.vstack(floating_cashflows)
-floating_cashflows = pd.DataFrame(floating_cashflows, index=paySchedule[1:])
 

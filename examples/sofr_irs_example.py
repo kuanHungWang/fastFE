@@ -48,16 +48,16 @@ print(f' trade date: {today}')
 print(f' settlement date: {settlementDate}')
 
 # prepare market data for curve and model calibration
-df_deposit = get_deposit(['1M', '2M', '3M', '6M', '9M'])
-df_swap = get_swap(['1Y', '2Y', '5Y', '7Y', '10Y', '15Y', '20Y', '25Y', '30Y'])
+df_deposit = get_deposit("USD", ['1M', '2M', '3M', '6M', '9M'])
+df_swap = get_swap("USD", ['1Y', '2Y', '5Y', '7Y', '10Y', '15Y', '20Y', '25Y', '30Y'])
 
 # swaption data
-df_swaption = get_swaption(['2Y', '3Y'], ['5Y', '5Y'])
+df_swaption = get_swaption("USD",['2Y', '3Y'], ['5Y', '5Y'])
 
 
 # create curve and calibrate model by swaptions
-curve = bootstrap_curve('USD', today, deposit=df_deposit, swap=df_swap)
-hw_model = HullWhiteModel(today, curve, 'USD')
+curve = bootstrap_curve(today, deposit=df_deposit, swap=df_swap)
+hw_model = HullWhiteModel(today, curve)
 hw_model.calibrate(df_swaption)
 
 
@@ -78,7 +78,7 @@ def create_sofr_index(ts):
     return ql.OvernightIndex('SOFR', 1, currency, calendar, ql.Actual360(), ts)
 
 n_path = 6
-underlying_path, fixings, discountFactors = hw_model.monte_carlo_paths([create_sofr_index], fixingSchedule, paymentSchedule, n_path)
+underlying_path, fixings, discountFactors = hw_model.monte_carlo_paths({"sofr": create_sofr_index}, fixingSchedule, paymentSchedule, n_path)
 # notes: 
 # 1. the resulting underlying_path, fixings, discountFactors are dataframes with index of ql.Date.
 # 2. fixings is a list of dataframes, each dataframe is the fixing of ibor index.
@@ -89,7 +89,7 @@ underlying_path, fixings, discountFactors = hw_model.monte_carlo_paths([create_s
 paySchedule = [d for d in paySchedule]
 recSchedule = [d for d in recSchedule]
 
-fixings=fixings[0]
+fixings=fixings["sofr"]
 print(f'fixings: \n{fixings}')
 
 
@@ -144,7 +144,7 @@ exercise_payoff = lambda x: np.zeros(len(x))   # The cashflow of calling(cancell
 lse = LongstaffSchwartz(
     cashflows=net_cashflows.iloc[1:], # remove first row
     discountFactors=single_period_dcf,
-    exercise_schedule=exercisable,
+    exercisable=exercisable,
     exercise_payoff=exercise_payoff,
     observable=observations
 )

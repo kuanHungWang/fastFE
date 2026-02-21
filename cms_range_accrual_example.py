@@ -63,9 +63,9 @@ df_swaption = pd.DataFrame({
     'volatility': [0.13, 0.21, 0.12, 0.14, 0.13, 0.07, 0.06, 0.05]
 })
 
-curve = bootstrap_curve('USD', today, deposit=df_deposit, swap=df_swap)
+curve = bootstrap_curve(today, deposit=df_deposit, swap=df_swap)
 print(dayCount.yearFraction(settlementDate, curve.maxDate()))
-hw_model = HullWhiteModel(today, curve, 'USD')
+hw_model = HullWhiteModel(today, curve)
 hw_model.calibrate(df_swaption)
 
 
@@ -88,7 +88,7 @@ def create_ibor_6M(ts):
     return ql.IborIndex('MyIndex', ql.Period('6m'), 2, currency, calendar, date_rolling_convention, True, dayCount, ts)
 
 
-underlying_path, fixings, discountFactors = hw_model.monte_carlo_paths([create_2Y_CMS, create_ibor_6M], fixingSchedule, paymentSchedule, n_path)
+underlying_path, fixings, discountFactors = hw_model.monte_carlo_paths({"CMS":create_2Y_CMS, "libor":create_ibor_6M}, fixingSchedule, paymentSchedule, n_path)
 # underlying_path, fixings, discountFactors are dataframes with index of ql.Date.
 
 paySchedule = [d for d in paySchedule]
@@ -122,7 +122,7 @@ rate = 0.03
 acruals=[]
 notional = 1_000_000
 range_acrual_cashflows = pd.DataFrame(np.zeros((len(paySchedule),n_path)),index = paySchedule)
-cms_fixings = fixings[0]
+cms_fixings = fixings['CMS']
 for d in paySchedule[1:]:
     end_date = d
     period_fixing=cms_fixings.loc[(cms_fixings.index>start_date)&(cms_fixings.index<=end_date)].copy()  # get fixing rates withing accrual period
@@ -140,7 +140,7 @@ print(f'\nrange_acrual_cashflows: \n{range_acrual_cashflows}')
     
 
 # floating cashflows
-libor_fixings = fixings[1]
+libor_fixings = fixings['libor']
 libor_fixing_schedule = [calendar.advance(d,ql.Period(-2, ql.Days)) for d in paymentSchedule]
 print(f'\nlibor_fixings: \n{len(libor_fixings)}')
 fixing_date_map = pd.Series(libor_fixing_schedule, index=paymentSchedule)
@@ -179,7 +179,7 @@ exercise_payoff = lambda x: np.zeros(len(x))
 lse = LongstaffSchwartz(
     cashflows=net_cashflows.iloc[1:], # remove first row
     discountFactors=single_period_dcf,
-    exercise_schedule=exercisable,
+    exercisable=exercisable,
     exercise_payoff=exercise_payoff,
     observable=observations
 )
