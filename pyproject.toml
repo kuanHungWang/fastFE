@@ -3,7 +3,7 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.backends.legacy:build"
 
 [project]
-name = "easyql"
+name = "fastquant"
 version = "0.1.0"
 description = "A Python library that simplifies QuantLib for pricing exotic derivatives — curves, vol surfaces, and Monte Carlo out of the box."
 readme = "README.md"
@@ -54,9 +54,9 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/kuanhungwang/easyql"
-Issues = "https://github.com/kuanhungwang/easyql/issues"
+Homepage = "https://github.com/kuanhungwang/fastquant"
+Issues = "https://github.com/kuanhungwang/fastquant/issues"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["easyql*"]
+include = ["fastquant*"]
