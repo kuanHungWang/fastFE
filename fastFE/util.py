@@ -1,5 +1,6 @@
 import QuantLib as ql
 import pandas as pd
+import numpy as np
 
 def subset_to_bool(subset_dates, full_dates)->pd.Series:
     """
@@ -64,6 +65,34 @@ def year_fraction(schedule, dayCount: ql.DayCounter, accoumulative=False):
         result.insert(0, 0)
         return result
         
+def simulation_time_grid(dates, dayCount: ql.DayCounter):
+    """
+    Build a strictly increasing Monte Carlo time grid from a list of dates.
+    When to use: to build the time grid for a path generator from simulation dates.
+    Parameters:
+        dates (list or ql.Schedule): Simulation dates, in increasing order.
+        dayCount: QuantLib DayCounter used to convert dates into times. It should be the day counter
+            of the term structure driving the process, so that path times match curve times.
+
+    Returns:
+        tuple: (times, index) where times is a strictly increasing list of distinct times starting at 0,
+        and index is a numpy array mapping each input date to its position in times. Some day counters
+        (e.g. 30/360) give consecutive dates the same time; those dates share one grid point, so a
+        path simulated on times can be expanded back to every input date with path[index].
+    """
+    if isinstance(dates, ql.Schedule):
+        dates = [d for d in dates]
+    times = []
+    index = []
+    for d in dates:
+        t = dayCount.yearFraction(dates[0], d)
+        if times and t < times[-1]:
+            raise ValueError(f"dates must be in increasing order, got {d} after a later time")
+        if not times or t > times[-1]:
+            times.append(t)
+        index.append(len(times) - 1)
+    return times, np.array(index)
+
 def combine_schedule(*schedules):
     """
     Combine multiple schedules into a single sorted list of unique dates.
