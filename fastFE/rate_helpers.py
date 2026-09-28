@@ -1,4 +1,5 @@
 import QuantLib as ql
+import warnings
 import pandas as pd
 import numpy as np
 from collections import namedtuple
@@ -76,9 +77,9 @@ def create_swap_rate_helpers(df: pd.DataFrame, fixed_leg_conventions: dict = Non
         tenor_plus_one_year = f"{int(last_tenor[:-1]) + 1}Y"
         padding_raw = last_row.copy()
         padding_raw['tenor'] = tenor_plus_one_year
-        df = df._append(padding_raw, ignore_index=True)
-    except:
-        print("Failed to add one year to the last tenor, using original data.")
+        df = pd.concat([df, padding_raw.to_frame().T], ignore_index=True)
+    except (IndexError, KeyError, ValueError) as e:
+        warnings.warn(f"Failed to add one year to the last tenor, using original data: {e}")
     if fixed_leg_conventions is None:
         fixed_leg_conventions = {}
     if floating_leg_conventions is None:

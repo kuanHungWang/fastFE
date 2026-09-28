@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+from statistics import NormalDist
 from typing import List, Callable
 from sklearn import linear_model
 from .util import get_nearest_fixing_date, year_fraction
@@ -162,10 +163,12 @@ class LongstaffSchwartz():
         list
             The confidence interval of the fair value.
         """
-        # asume sampled valuation is normal distribution, alpha for two tail area.
-        std = self.valuation.std()
+        # the sample mean is asymptotically normal (CLT), alpha for two tail area.
+        n = len(self.valuation)
         mean = self.valuation.mean()
-        return [mean - std * np.sqrt(alpha/2), mean + std * np.sqrt(alpha/2)]
+        std_error = self.valuation.std(ddof=1) / np.sqrt(n)
+        z = NormalDist().inv_cdf(1 - alpha / 2)
+        return [mean - z * std_error, mean + z * std_error]
         
     def survival_probability(self):
         """

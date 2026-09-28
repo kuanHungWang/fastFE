@@ -70,13 +70,13 @@ vol_series = pd.Series(
 )
 vol_curve = create_black_vol_curve(vol_series, today)
 
-# 2D vol surface (rows = expiry tenors, columns = strikes)
+# 2D vol surface (rows = strikes, columns = expiry tenors)
 vol_df = pd.DataFrame(
-    [[0.20, 0.22, 0.24],
-     [0.21, 0.23, 0.25],
-     [0.22, 0.24, 0.26]],
-    index=['1M', '3M', '6M'],
-    columns=[90.0, 100.0, 110.0]
+    [[0.20, 0.21, 0.22],
+     [0.22, 0.23, 0.24],
+     [0.24, 0.25, 0.26]],
+    index=[90.0, 100.0, 110.0],
+    columns=['1M', '3M', '6M']
 )
 vol_surface = create_black_vol_surface(vol_df, today)
 ```
@@ -278,7 +278,7 @@ Stochastic volatility equity model. Call `.calibrate(vol_df, spot)`, then `.mont
 
 ### `BlackScholesMertonModel(risk_free_curve, dividend_curve, vol, spot)`
 
-Equity/index model. Accepts constant vol, vol curve, or vol surface. Call `.monte_carlo_paths(schedule, numPaths)`.
+Equity/index model. Accepts constant vol, vol curve, or vol surface. Call `.monte_carlo_paths(schedule, numPaths, seed=None)`; pass a non-zero `seed` for reproducible paths.
 
 ### `GarmanKohlagenProcessModel(domestic_curve, foreign_curve, vol, spot)`
 

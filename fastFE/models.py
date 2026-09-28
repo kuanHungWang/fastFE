@@ -1,17 +1,29 @@
 import QuantLib as ql
 import pandas as pd
 import numpy as np
-from typing import List, Callable, Dict, Literal
+from typing import List, Callable, Dict, Literal, Optional
 from .vol_helper import (
     create_swaption_helper,
     create_heston_model_helper,
     create_black_vol_curve,
     create_black_vol_surface
 )
-from .util import year_fraction
+from .util import simulation_time_grid
 from .market_data import get_volatility_surface
 
 from .type_hint import IndexFactory, Schedule
+
+def _gaussian_multi_path_generator(process, time_grid, seed=None):
+    """
+    Create a GaussianMultiPathGenerator for process on time_grid.
+    With seed=None (or 0), QuantLib draws a seed from its clock-based SeedGenerator, so paths differ between calls.
+    """
+    n_steps = len(time_grid) - 1
+    dimension = process.factors()
+    uniform = ql.UniformRandomGenerator() if seed is None else ql.UniformRandomGenerator(seed)
+    rng = ql.UniformRandomSequenceGenerator(dimension * n_steps, uniform)
+    sequenceGenerator = ql.GaussianRandomSequenceGenerator(rng)
+    return ql.GaussianMultiPathGenerator(process, time_grid, sequenceGenerator, False)
 
 def calibration_detail(helpers):
     """
@@ -64,7 +76,7 @@ class GarmanKohlagenProcessModel():
         self.process = process
 
 
-    def monte_carlo_paths(self, fixingSchedule:ql.Schedule, numPaths:int):
+    def monte_carlo_paths(self, fixingSchedule:ql.Schedule, numPaths:int, seed:Optional[int]=None):
         """       
         Parameters
         ----------
@@ -72,6 +84,9 @@ class GarmanKohlagenProcessModel():
             Schedule of dates for which to generate simulated values
         numPaths : int
             Number of Monte Carlo paths to simulate
+        seed : int, optional
+            Seed of the random number generator. Pass a fixed non-zero value to get reproducible paths;
+            if None, a different seed is drawn on every call.
             
         Returns
         -------
@@ -82,25 +97,19 @@ class GarmanKohlagenProcessModel():
         """
 
         process = self.process
-        # Time grid
-        dayCount = ql.Actual365Fixed()
-        time_grid = year_fraction(fixingSchedule, dayCount, accoumulative=True)
-        n_steps = len(time_grid) - 1
-        dimension = process.factors()
-        rng = ql.UniformRandomSequenceGenerator(dimension * n_steps, ql.UniformRandomGenerator())
-        sequenceGenerator = ql.GaussianRandomSequenceGenerator(rng)
-        pathGenerator = ql.GaussianMultiPathGenerator(process, time_grid, sequenceGenerator, False)
+        # Time grid, measured with the day counter of the curve driving the process
+        time_grid, grid_index = simulation_time_grid(fixingSchedule, self.domesticRiskFreeCurve.dayCounter())
+        pathGenerator = _gaussian_multi_path_generator(process, time_grid, seed)
 
         # Simulate paths
         spot_paths = []
         for i in range(numPaths):
             samplePath = pathGenerator.next()
             values = samplePath.value()
-            # Heston: first factor is the spot process
             spot_path = [v for v in values[0]]
             spot_paths.append(spot_path)
 
-        spot_paths = np.array(spot_paths).T  # shape: (len(all_dates), numPaths)
+        spot_paths = np.array(spot_paths).T[grid_index]  # shape: (len(fixingSchedule), numPaths)
 
         # Create DataFrame for all simulation dates
         spot_paths_df = pd.DataFrame(spot_paths, index=[d for d in fixingSchedule])
@@ -139,7 +148,7 @@ class BlackScholesMertonModel():
         self.process = process
 
 
-    def monte_carlo_paths(self, fixingSchedule:ql.Schedule, numPaths:int):
+    def monte_carlo_paths(self, fixingSchedule:ql.Schedule, numPaths:int, seed:Optional[int]=None):
         """       
         Parameters
         ----------
@@ -147,6 +156,9 @@ class BlackScholesMertonModel():
             Schedule of dates for which to generate simulated values
         numPaths : int
             Number of Monte Carlo paths to simulate
+        seed : int, optional
+            Seed of the random number generator. Pass a fixed non-zero value to get reproducible paths;
+            if None, a different seed is drawn on every call.
             
         Returns
         -------
@@ -156,25 +168,19 @@ class BlackScholesMertonModel():
             Shape: (len(fixingSchedule), numPaths)
         """
         process = self.process
-        # Time grid
-        dayCount = ql.Actual365Fixed()
-        time_grid = year_fraction(fixingSchedule, dayCount, accoumulative=True)
-        n_steps = len(time_grid) - 1
-        dimension = process.factors()
-        rng = ql.UniformRandomSequenceGenerator(dimension * n_steps, ql.UniformRandomGenerator())
-        sequenceGenerator = ql.GaussianRandomSequenceGenerator(rng)
-        pathGenerator = ql.GaussianMultiPathGenerator(process, time_grid, sequenceGenerator, False)
+        # Time grid, measured with the day counter of the curve driving the process
+        time_grid, grid_index = simulation_time_grid(fixingSchedule, self.yield_curve.dayCounter())
+        pathGenerator = _gaussian_multi_path_generator(process, time_grid, seed)
 
         # Simulate paths
         spot_paths = []
         for i in range(numPaths):
             samplePath = pathGenerator.next()
             values = samplePath.value()
-            # Heston: first factor is the spot process
             spot_path = [v for v in values[0]]
             spot_paths.append(spot_path)
 
-        spot_paths = np.array(spot_paths).T  # shape: (len(all_dates), numPaths)
+        spot_paths = np.array(spot_paths).T[grid_index]  # shape: (len(fixingSchedule), numPaths)
 
         # Create DataFrame for all simulation dates
         spot_paths_df = pd.DataFrame(spot_paths, index=[d for d in fixingSchedule])
@@ -237,7 +243,7 @@ class HullWhiteModel():
             self.calibration_error = None
 
 
-    def monte_carlo_paths(self,  index_factories:Dict[str, IndexFactory], fixingSchedule: Schedule, paymentSchedule: Schedule, numPaths:int):
+    def monte_carlo_paths(self,  index_factories:Dict[str, IndexFactory], fixingSchedule: Schedule, paymentSchedule: Schedule, numPaths:int, seed:Optional[int]=None):
         """
         Generate Monte Carlo simulation paths for interest rates using the Hull-White model.
         
@@ -256,6 +262,9 @@ class HullWhiteModel():
             Schedule of dates for which to calculate discount factors
         numPaths : int
             Number of Monte Carlo paths to simulate
+        seed : int, optional
+            Seed of the random number generator. Pass a fixed non-zero value to get reproducible paths;
+            if None, a different seed is drawn on every call.
             
         Returns
         -------
@@ -281,16 +290,16 @@ class HullWhiteModel():
         frequency = ql.Period('1d')
         all_dates = ql.Schedule(self.settlementDate, self.curve.maxDate(), frequency, ql.NullCalendar(), ql.Following, ql.Following, ql.DateGeneration.Backward, False)
         # print(f'first date: {all_dates[0]}, last date: {all_dates[-1]}')
-        print(len([d for d in all_dates]))
-        dayCount=ql.Actual365Fixed()
-
-        dimension = process.factors()
-        
-        time_grid = year_fraction(all_dates, dayCount, accoumulative=True)
-        n_steps = len(time_grid)-1
-        rng = ql.UniformRandomSequenceGenerator(dimension * n_steps, ql.UniformRandomGenerator())
-        sequenceGenerator = ql.GaussianRandomSequenceGenerator(rng)
-        pathGenerator = ql.GaussianMultiPathGenerator(process, time_grid, sequenceGenerator, False)
+        # Measure time with the curve's own day counter so that the process and the simulated
+        # forward curves agree with the input curve. Dates sharing a time (e.g. the 30th and 31st
+        # under 30/360) are simulated once.
+        dayCount = term_structure.dayCounter()
+        time_grid, grid_index = simulation_time_grid(all_dates, dayCount)
+        grid_dates = [None] * len(time_grid)
+        for d, i in zip(all_dates, grid_index):
+            if grid_dates[i] is None:
+                grid_dates[i] = d
+        pathGenerator = _gaussian_multi_path_generator(process, time_grid, seed)
 
 
         underlying_path = []
@@ -303,7 +312,7 @@ class HullWhiteModel():
             underlying = values[0]
             underlying = [s for s in underlying]
             underlying_path.append(underlying)
-            fwd_crv = ql.YieldTermStructureHandle(ql.ForwardCurve([d for d in all_dates], underlying, dayCount))
+            fwd_crv = ql.YieldTermStructureHandle(ql.ForwardCurve(grid_dates, underlying, dayCount))
             # print(f'fwd_crv start date: {fwd_crv.dates()[0]}, end date: {fwd_crv.dates()[-1]}')
             ts = fwd_crv
             for k, index_factory in index_factories.items():
@@ -312,7 +321,7 @@ class HullWhiteModel():
             discountFactors.append([fwd_crv.discount(d) for d in paymentSchedule])
             forward_curves.append(fwd_crv)
             
-        underlying_path = np.array(underlying_path).transpose()
+        underlying_path = np.array(underlying_path).transpose()[grid_index]
         fixings_list = {k:np.array(fixings).transpose() for k, fixings in fixings_list.items()}
         discountFactors = np.array(discountFactors).transpose()
 
@@ -380,7 +389,9 @@ class HestonModel():
         lm = ql.LevenbergMarquardt(1e-8, 1e-8, 1e-8)
         endCriteria=ql.EndCriteria(500, 300, 1.0e-8,1.0e-8, 1.0e-8)
         model.calibrate(helpers, lm, endCriteria)
-        self.process = ql.HestonProcess(yield_term_structure, dividend_term_structure, initialValue,*model.params())
+        # model.params() is ordered (theta, kappa, sigma, rho, v0); HestonProcess takes (v0, kappa, theta, sigma, rho)
+        self.process = ql.HestonProcess(yield_term_structure, dividend_term_structure, initialValue,
+                                        model.v0(), model.kappa(), model.theta(), model.sigma(), model.rho())
 
         self.model = model
         try:
@@ -388,31 +399,25 @@ class HestonModel():
         except:
             self.calibration_detail = None
 
-    def monte_carlo_paths(self, fixingSchedule: Schedule, numPaths:int):
+    def monte_carlo_paths(self, fixingSchedule: Schedule, numPaths:int, seed:Optional[int]=None):
         """
         generate paths based on fixing schedule
         Args:
             fixingSchedule (Schedule): fixing schedule
             numPaths (int): number of paths
+            seed (int, optional): seed of the random number generator. Pass a fixed non-zero value to get
+                reproducible paths; if None, a different seed is drawn on every call.
 
         Returns:
             DataFrame with index as fixing dates, columns as paths
         """
         # Generate all daily dates between fixingSchedule[0] and fixingSchedule[-1]
         all_dates = ql.Schedule(fixingSchedule[0], fixingSchedule[-1], ql.Period('1d'), self.calendar, ql.Following, ql.Following, ql.DateGeneration.Backward, False)
-        print(len(all_dates))
 
         process = self.process
-        # Time grid
-        dayCount = ql.Actual365Fixed()
-        time_grid = year_fraction(all_dates, dayCount, accoumulative=True)
-        print(len(time_grid))
-        print(len(all_dates))
-        n_steps = len(time_grid) - 1
-        dimension = process.factors()
-        rng = ql.UniformRandomSequenceGenerator(dimension * n_steps, ql.UniformRandomGenerator())
-        sequenceGenerator = ql.GaussianRandomSequenceGenerator(rng)
-        pathGenerator = ql.GaussianMultiPathGenerator(process, time_grid, sequenceGenerator, False)
+        # Time grid, measured with the day counter of the curve driving the process
+        time_grid, grid_index = simulation_time_grid(all_dates, self.yield_curve.dayCounter())
+        pathGenerator = _gaussian_multi_path_generator(process, time_grid, seed)
 
         # Simulate paths
         spot_paths = []
@@ -423,7 +428,7 @@ class HestonModel():
             spot_path = [v for v in values[0]]
             spot_paths.append(spot_path)
 
-        spot_paths = np.array(spot_paths).T  # shape: (len(all_dates), numPaths)
+        spot_paths = np.array(spot_paths).T[grid_index]  # shape: (len(all_dates), numPaths)
 
         # Create DataFrame for all simulation dates
         all_dates_list = [d for d in all_dates]
@@ -450,7 +455,7 @@ class MultiAssetModel():
         self.processes = processes
         self.correlation_matrix = correlation_matrix
         
-    def monte_carlo_paths(self, fixingSchedule:Schedule, numPaths:int, dayCount:ql.DayCounter=ql.Actual365Fixed()):
+    def monte_carlo_paths(self, fixingSchedule:Schedule, numPaths:int, dayCount:ql.DayCounter=ql.Actual365Fixed(), seed:Optional[int]=None):
         """
         Generate paths for multiple assets based on fixing schedule.
 
@@ -462,6 +467,9 @@ class MultiAssetModel():
             Number of Monte Carlo paths to simulate
         dayCount : ql.DayCounter
             Day counter for the fixing schedule
+        seed : int, optional
+            Seed of the random number generator. Pass a fixed non-zero value to get reproducible paths;
+            if None, a different seed is drawn on every call.
 
         Returns
         -------
@@ -471,12 +479,8 @@ class MultiAssetModel():
 
         process = ql.StochasticProcessArray(self.processes, self.correlation_matrix)
         # Time grid
-        time_grid = year_fraction(fixingSchedule, dayCount, accoumulative=True)
-        n_steps = len(time_grid) - 1
-        dimension = process.factors()
-        rng = ql.UniformRandomSequenceGenerator(dimension * n_steps, ql.UniformRandomGenerator())
-        sequenceGenerator = ql.GaussianRandomSequenceGenerator(rng)
-        pathGenerator = ql.GaussianMultiPathGenerator(process, time_grid, sequenceGenerator, False)
+        time_grid, grid_index = simulation_time_grid(fixingSchedule, dayCount)
+        pathGenerator = _gaussian_multi_path_generator(process, time_grid, seed)
 
         # Simulate paths
         spot_paths = [[] for _ in range(len(self.processes))]
@@ -486,7 +490,7 @@ class MultiAssetModel():
             for i, value in enumerate(values):
                 spot_paths[i].append([v for v in value])
         
-        transposed_paths = [np.array(path).T for path in spot_paths]
+        transposed_paths = [np.array(path).T[grid_index] for path in spot_paths]
             
 
         # Create DataFrame for all simulation dates
