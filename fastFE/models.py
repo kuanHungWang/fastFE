@@ -25,6 +25,12 @@ def _gaussian_multi_path_generator(process, time_grid, seed=None):
     sequenceGenerator = ql.GaussianRandomSequenceGenerator(rng)
     return ql.GaussianMultiPathGenerator(process, time_grid, sequenceGenerator, False)
 
+def _local_vol_or_nan(local_vol, t, spot):
+    try:
+        return local_vol.localVol(t, spot, True)
+    except RuntimeError:  # QuantLib: negative local variance where the black surface is not smooth enough
+        return np.nan
+
 def _vectorized_gbs_paths(process, time_grid, numPaths, seed=None, grid_points=101):
     """
     Simulate numPaths paths of a QuantLib GeneralizedBlackScholesProcess (Black-Scholes-Merton, Garman-Kohlhagen)
@@ -59,8 +65,13 @@ def _vectorized_gbs_paths(process, time_grid, numPaths, seed=None, grid_points=1
             log_s += drift + std * z[i]
         else:
             grid = np.linspace(log_s.min() - 1e-8, log_s.max() + 1e-8, grid_points)
-            vols = np.array([local_vol.localVol(t0, float(np.exp(g)), True) for g in grid])
-            sigma = np.interp(log_s, grid, vols)
+            vols = np.array([_local_vol_or_nan(local_vol, t0, float(np.exp(g))) for g in grid])
+            ok = np.isfinite(vols)
+            if not ok.any():
+                raise RuntimeError(f"local volatility is undefined at every spot in the grid at time {t0}")
+            # Grid nodes in the far tails can hit a non-smooth part of the surface; skip them and let the
+            # interpolation carry the nearest valid local vol.
+            sigma = np.interp(log_s, grid[ok], vols[ok])
             r = r_ts.forwardRate(t0, t0 + dt, ql.Continuous, ql.NoFrequency, True).rate()
             q = q_ts.forwardRate(t0, t0 + dt, ql.Continuous, ql.NoFrequency, True).rate()
             log_s += (r - q - 0.5 * sigma ** 2) * dt + sigma * np.sqrt(dt) * z[i]
