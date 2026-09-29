@@ -25,6 +25,59 @@ def _gaussian_multi_path_generator(process, time_grid, seed=None):
     sequenceGenerator = ql.GaussianRandomSequenceGenerator(rng)
     return ql.GaussianMultiPathGenerator(process, time_grid, sequenceGenerator, False)
 
+def _local_vol_or_nan(local_vol, t, spot):
+    try:
+        return local_vol.localVol(t, spot, True)
+    except RuntimeError:  # QuantLib: negative local variance where the black surface is not smooth enough
+        return np.nan
+
+def _vectorized_gbs_paths(process, time_grid, numPaths, seed=None, grid_points=101):
+    """
+    Simulate numPaths paths of a QuantLib GeneralizedBlackScholesProcess (Black-Scholes-Merton, Garman-Kohlhagen)
+    with numpy, one vectorised update per time step instead of one Python call per path.
+
+    The scheme is the one QuantLib's process.evolve uses: an exact log step when the volatility does not
+    depend on the strike (constant or curve), and a log-Euler step driven by the Dupire local volatility
+    otherwise. The local volatility is evaluated by QuantLib on a small spot grid per step and interpolated
+    linearly in log-spot, so the number of QuantLib calls is independent of numPaths.
+
+    Returns an array of shape (len(time_grid), numPaths). Random numbers come from numpy
+    (np.random.default_rng(seed)), so paths are reproducible for a fixed seed but differ from QuantLib's generator.
+    """
+    times = np.asarray(time_grid, dtype=float)
+    n_steps = len(times) - 1
+    s0 = process.x0()
+    rng = np.random.default_rng(seed)
+    z = rng.standard_normal((n_steps, numPaths))
+
+    paths = np.empty((len(times), numPaths))
+    paths[0] = s0
+    log_s = np.full(numPaths, np.log(s0))
+    local_vol = process.localVolatility()
+    r_ts, q_ts = process.riskFreeRate(), process.dividendYield()
+    for i in range(n_steps):
+        t0, dt = times[i], times[i + 1] - times[i]
+        # Strike independent volatility: evolve() is x0*exp(drift + std*dw), so read both terms at x0=1.
+        lo, hi = process.evolve(t0, 0.5 * s0, dt, 1.0) / (0.5 * s0), process.evolve(t0, 2.0 * s0, dt, 1.0) / (2.0 * s0)
+        if np.isclose(lo, hi, rtol=1e-12, atol=0.0):
+            drift = np.log(process.evolve(t0, 1.0, dt, 0.0))
+            std = np.log(process.evolve(t0, 1.0, dt, 1.0)) - drift
+            log_s += drift + std * z[i]
+        else:
+            grid = np.linspace(log_s.min() - 1e-8, log_s.max() + 1e-8, grid_points)
+            vols = np.array([_local_vol_or_nan(local_vol, t0, float(np.exp(g))) for g in grid])
+            ok = np.isfinite(vols)
+            if not ok.any():
+                raise RuntimeError(f"local volatility is undefined at every spot in the grid at time {t0}")
+            # Grid nodes in the far tails can hit a non-smooth part of the surface; skip them and let the
+            # interpolation carry the nearest valid local vol.
+            sigma = np.interp(log_s, grid[ok], vols[ok])
+            r = r_ts.forwardRate(t0, t0 + dt, ql.Continuous, ql.NoFrequency, True).rate()
+            q = q_ts.forwardRate(t0, t0 + dt, ql.Continuous, ql.NoFrequency, True).rate()
+            log_s += (r - q - 0.5 * sigma ** 2) * dt + sigma * np.sqrt(dt) * z[i]
+        paths[i + 1] = np.exp(log_s)
+    return paths
+
 def calibration_detail(helpers):
     """
     Return the calibration detail of the model.
@@ -86,7 +139,8 @@ class GarmanKohlagenProcessModel():
             Number of Monte Carlo paths to simulate
         seed : int, optional
             Seed of the random number generator. Pass a fixed non-zero value to get reproducible paths;
-            if None, a different seed is drawn on every call.
+            if None, a different seed is drawn on every call. Paths are generated with numpy, so
+            they differ from those of QuantLib's generator for the same seed.
             
         Returns
         -------
@@ -99,17 +153,7 @@ class GarmanKohlagenProcessModel():
         process = self.process
         # Time grid, measured with the day counter of the curve driving the process
         time_grid, grid_index = simulation_time_grid(fixingSchedule, self.domesticRiskFreeCurve.dayCounter())
-        pathGenerator = _gaussian_multi_path_generator(process, time_grid, seed)
-
-        # Simulate paths
-        spot_paths = []
-        for i in range(numPaths):
-            samplePath = pathGenerator.next()
-            values = samplePath.value()
-            spot_path = [v for v in values[0]]
-            spot_paths.append(spot_path)
-
-        spot_paths = np.array(spot_paths).T[grid_index]  # shape: (len(fixingSchedule), numPaths)
+        spot_paths = _vectorized_gbs_paths(process, time_grid, numPaths, seed)[grid_index]  # shape: (len(fixingSchedule), numPaths)
 
         # Create DataFrame for all simulation dates
         spot_paths_df = pd.DataFrame(spot_paths, index=[d for d in fixingSchedule])
@@ -158,7 +202,8 @@ class BlackScholesMertonModel():
             Number of Monte Carlo paths to simulate
         seed : int, optional
             Seed of the random number generator. Pass a fixed non-zero value to get reproducible paths;
-            if None, a different seed is drawn on every call.
+            if None, a different seed is drawn on every call. Paths are generated with numpy, so
+            they differ from those of QuantLib's generator for the same seed.
             
         Returns
         -------
@@ -170,17 +215,7 @@ class BlackScholesMertonModel():
         process = self.process
         # Time grid, measured with the day counter of the curve driving the process
         time_grid, grid_index = simulation_time_grid(fixingSchedule, self.yield_curve.dayCounter())
-        pathGenerator = _gaussian_multi_path_generator(process, time_grid, seed)
-
-        # Simulate paths
-        spot_paths = []
-        for i in range(numPaths):
-            samplePath = pathGenerator.next()
-            values = samplePath.value()
-            spot_path = [v for v in values[0]]
-            spot_paths.append(spot_path)
-
-        spot_paths = np.array(spot_paths).T[grid_index]  # shape: (len(fixingSchedule), numPaths)
+        spot_paths = _vectorized_gbs_paths(process, time_grid, numPaths, seed)[grid_index]  # shape: (len(fixingSchedule), numPaths)
 
         # Create DataFrame for all simulation dates
         spot_paths_df = pd.DataFrame(spot_paths, index=[d for d in fixingSchedule])
